@@ -1,4 +1,4 @@
-maincontroller2/adc.o: ..\Core\Src\adc.c ..\Core\Inc\adc.h \
+maincontroller2/tmp102.o: ..\Libs\TMP102\tmp102.c ..\Libs\TMP102\tmp102.h \
   ..\Core\Inc\main.h ..\Drivers\STM32G4xx_HAL_Driver\Inc\stm32g4xx_hal.h \
   ..\Core\Inc\stm32g4xx_hal_conf.h \
   ..\Drivers\STM32G4xx_HAL_Driver\Inc\stm32g4xx_hal_rcc.h \
@@ -35,7 +35,4 @@ maincontroller2/adc.o: ..\Core\Src\adc.c ..\Core\Inc\adc.h \
   ..\Drivers\STM32G4xx_HAL_Driver\Inc\stm32g4xx_hal_tim.h \
   ..\Drivers\STM32G4xx_HAL_Driver\Inc\stm32g4xx_hal_tim_ex.h \
   ..\Drivers\STM32G4xx_HAL_Driver\Inc\stm32g4xx_hal_uart.h \
-  ..\Drivers\STM32G4xx_HAL_Driver\Inc\stm32g4xx_hal_uart_ex.h \
-  ..\Libs\ZUI\zui.h ..\HARDWARE\LCD\lcd.h ..\HARDWARE\LCD\lcd_init.h \
-  ..\Core\Inc\spi.h ..\HARDWARE\LCD\lcdfont.h ..\Core\Inc\dma.h \
-  ..\HARDWARE\LCD\pic.h ..\Libs\ZUI\zui_usr.h
+  ..\Drivers\STM32G4xx_HAL_Driver\Inc\stm32g4xx_hal_uart_ex.h
