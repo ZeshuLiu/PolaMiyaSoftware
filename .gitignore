@@ -9,3 +9,4 @@ code/PowerManage/MDK-ARM/tmp/*
 code/MainController2/MDK-ARM/out/*
 code/MainController2/MDK-ARM/tmp/*
 code/MainController2/MDK-ARM/*.log
+code/MainController2/MDK-ARM/.vscode/keil-assistant.log
