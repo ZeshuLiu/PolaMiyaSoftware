@@ -1,6 +1,6 @@
 CompileFlags:
   CompilationDatabase: >-
-    e:\Develop\PolaMiya\code\MainController2\MDK-ARM\out\MainController2\MainController2
+    e:\Develop\PolaMiyaSoftware\code\MainController2\MDK-ARM\out\MainController2\MainController2
   Add:
     - "-D_ILP32=1\r\n"
     - "-D_USE_STATIC_INLINE=1\r\n"
@@ -412,31 +412,34 @@ CompileFlags:
     - "-D__thumb2__=1\r\n"
     - "-D__thumb__=1\r\n"
     - '-D__ARMCOMPILER_LIBCXX=1'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/RTE/_MainController2'
+    - >-
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/RTE/_MainController2
     - '-IC:/Users/LZS/AppData/Local/arm/packs/ARM/CMSIS-DSP/1.16.2/Include'
     - '-IC:/Users/LZS/AppData/Local/arm/packs/ARM/CMSIS-DSP/1.16.2/PrivateInclude'
     - '-IC:/Users/LZS/AppData/Local/arm/packs/ARM/CMSIS/6.1.0/CMSIS/Core/Include'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Core/Inc'
+    - '-IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Core/Inc'
     - >-
-      -IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Drivers/STM32G4xx_HAL_Driver/Inc
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Drivers/STM32G4xx_HAL_Driver/Inc
     - >-
-      -IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy
     - >-
-      -IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Drivers/CMSIS/Device/ST/STM32G4xx/Include
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Drivers/CMSIS/Device/ST/STM32G4xx/Include
     - >-
-      -IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Drivers/CMSIS/Include
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../USB_Device/App'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../USB_Device/Target'
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Drivers/CMSIS/Include
     - >-
-      -IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Middlewares/ST/STM32_USB_Device_Library/Core/Inc
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../USB_Device/App
     - >-
-      -IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../HARDWARE/LCD'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Libs/gui_usr'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Libs/ZUI'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Libs/TMP102'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Libs/Motors'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Libs/SDM18'
-    - '-IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/../Libs/EEPROM'
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../USB_Device/Target
     - >-
-      -IE:/Develop/PolaMiya/code/MainController2/MDK-ARM/tmp/MainController2+MainController2
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Middlewares/ST/STM32_USB_Device_Library/Core/Inc
+    - >-
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc
+    - '-IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../HARDWARE/LCD'
+    - '-IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Libs/gui_usr'
+    - '-IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Libs/ZUI'
+    - '-IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Libs/TMP102'
+    - '-IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Libs/Motors'
+    - '-IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Libs/SDM18'
+    - '-IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/../Libs/EEPROM'
+    - >-
+      -IE:/Develop/PolaMiyaSoftware/code/MainController2/MDK-ARM/tmp/MainController2+MainController2

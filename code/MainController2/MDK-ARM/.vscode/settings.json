@@ -16,6 +16,6 @@
     "debug.hideSlowPreLaunchWarning": true,
     "debug.showInStatusBar": "never",
     "clangd.arguments": [
-        "--compile-commands-dir=e:\\Develop\\PolaMiya\\code\\MainController2\\MDK-ARM\\out\\MainController2\\MainController2"
+        "--compile-commands-dir=e:\\Develop\\PolaMiyaSoftware\\code\\MainController2\\MDK-ARM\\out\\MainController2\\MainController2"
     ]
 }
