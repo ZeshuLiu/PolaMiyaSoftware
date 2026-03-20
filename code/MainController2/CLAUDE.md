@@ -4,20 +4,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-STM32G474RETx 微控制器项目，使用 STM32CubeMX 生成配置，通过 Keil MDK-ARM (CMSIS 6) 构建。这是一个主控设备项目，包含 LCD 显示、USB 通信、电机控制、电量计量等功能。
+STM32G474RETx 微控制器项目，使用 STM32CubeMX 生成配置，通过 Keil Studio (VS Code + CMSIS 6) 开发。这是一个主控设备项目，包含 LCD 显示、USB 通信、电机控制、电量计量等功能。
+
+> 完整项目（含机械/电路设计）：https://github.com/ZeshuLiu/PolaMiya
+
+## Repository Context
+
+本项目已从原始 PolaMiyaSoftware 仓库剥离，当前为独立的代码仓库：
+- **父仓库**: `PolaMiyaSoftware/` - 包含所有相机代码的整体项目
+- **当前仓库**: `PolaMiyaSoftware/code/MainController2/` - 主控器固件
 
 ## Build & Debug
 
-### 构建命令
-- 使用 **Keil MDK-ARM** 打开 `MDK-ARM/MainController2.uvprojx` 进行编译
-- 解决方案配置：`MDK-ARM/MainController2.csolution.yml`
-- 目标设备：STM32G474RETx
-- 编译器：ARM Compiler 6 (AC6)
+### 开发环境
+- **IDE**: Keil Studio (VS Code + CMSIS 6)
+- **项目文件**: `MDK-ARM/MainController2.uvprojx` 或 `MDK-ARM/MainController2.csolution.yml`
+- **目标设备**: STM32G474RETx
+- **编译器**: ARM Compiler 6 (AC6)
+
+### 烧录方法
+1. **Keil Studio (VS Code)**: 按 `F5` 烧录并调试
+2. **Keil MDK-ARM**: 点击 **Download** 按钮
+3. **命令行 (pyOCD)**: `pyocd flash -t stm32g474 MDK-ARM/Objects/MainController2.hex`
 
 ### 调试配置
 - 调试器：ST-Link via pyOCD
 - 接口：SWD，时钟 4MHz
-- 使用 VS Code CMake 调试配置（见 `.vscode/launch.json`）
 
 ## Code Architecture
 

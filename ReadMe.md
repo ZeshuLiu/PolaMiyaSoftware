@@ -1,62 +1,64 @@
-# ReadMe
+# PolaMiyaSoftware - 宝丽来相机改装项目
 
-宝丽来相机一台，具有测距、电动吐片等功能。
+宝丽来相机自动化改装项目软件部分。
 
-随后将加入如下功能：
+> 完整项目（含机械/电路设计）：https://github.com/ZeshuLiu/PolaMiya
 
-1. 自动对焦
-2. 测光
-3. 全息取景器
+## 仓库结构
 
+| 子目录 | 说明 |
+|--------|------|
+| [code/MainController2](code/MainController2) | 主控器固件 (STM32G474) |
+| [code/PowerManage2](code/PowerManage2) | 电源管理固件 |
 
+## 技术栈
 
-## 说明
+| 项目 | 主控器 (MainController2) | 电源管理 (PowerManage2) |
+|------|-------------------------|------------------------|
+| **MCU** | STM32G474RETx (Cortex-M4F) | STM32L011D4Px (Cortex-M0+) |
+| **IDE** | Keil MDK-ARM V5 / CMSIS 6 | Keil MDK-ARM V5 |
+| **编译器** | ARM Compiler 6 (AC6) | ARM Compiler 5 (AC5) |
+| **框架** | STM32CubeMX + HAL 库 | STM32CubeMX + HAL 库 |
+| **调试器** | ST-Link / pyOCD (SWD, 4MHz) | ST-Link (SWD) |
 
-项目比较简单，需要采购的大件只有两个，一个Mamiya Press 127mm镜头（不需要调焦桶）以及一个宝丽来AF5000（需要里面的吐片下巴、吐片电机和齿轮组。宝丽来的老方块机器里面这些零件看起来都是一样的，但是我没试过）。
+## 烧录方法
 
-结构文件夹里面就是机械零件，把镜头总成、片仓、吐片机构以及外壳里面的"STL"子文件夹里面的所有STL都3D打印出来就行了，装配可以参考总装配Rev_x.STEP。零件体积都比较小，可以用A1 mini或者Voron0打印。
+### 硬件连接
+```
+ST-Link V2    目标板
+---------    -------
+3.3V         VCC
+GND          GND
+SWCLK        SWCLK
+SWDIO        SWDIO
+NRST         NRST
+```
 
+### 使用 Keil Studio (VS Code)
+1. 在 VS Code 中打开 `code/MainController2` 文件夹
+2. 连接 ST-Link 调试器
+3. 按 `F5` 或点击运行/调试按钮烧录并启动调试
 
+### 使用 Keil MDK-ARM
+1. 打开 `MDK-ARM/MainController2.uvprojx`
+2. 点击 **Download** 按钮烧录
 
-## PCB
+### 使用命令行 (pyOCD)
+```bash
+# 主控器固件
+pyocd flash -t stm32g474 MDK-ARM/Objects/MainController2.hex
 
-PCB在电路文件夹，使用KiCad9绘制。总共有三部分：1. 电机驱动（电路\电机驱动\MotorDrive）；2. 主控器（电路\主控器\PM_Controller_R1）；3. 屏幕&按键（电路\主控器\DispKey）。所有制造所需的Gerber文件以及元器件清单在"production"子目录中。
-
-
-
-## 代码
-
-代码在code里面，均采用CubeMX生成，Keil uVision 社区版编写。MainController2的代码是给主控用的，PowerManage2是给电源管理mcu用的。
-
-
+# 电源管理固件
+pyocd flash -t stm32l011 code/PowerManage2/MDK-ARM/PowerManage2/PowerManage2.hex
+```
 
 ## 使用方法
 
-机身左下角按钮长按2秒开机或关机；三向按钮长按中键2秒吐片电机开始运行，随后短按吐片电机停止；在吐片电机运行时推动侧面推杆，相纸即吐出；测距开机即运行。
+### 相机操作
+- **开机/关机**：长按机身左下角按钮 2 秒
+- **吐片**：三向按钮长按中键 2 秒启动吐片电机，短按中键停止
+- **测距**：开机即运行
 
-
-
-## 样片
-
-稍后附上。
-
-
-
-## 后续计划
-
-1. 调整显示内容，提升美感；
-
-
-
-## 已知问题
-
-1. 吐片口密封性能不好，严禁在有相纸的情况下打开片仓
-
-**
-
-
-
-## 已修复问题
-
-1. （主控器Rev1.0硬件）相机吐片电机运行后会导致测距停止，该问题由硬件导致，已经在Rev1.2硬件中修复
-2. （主控器Rev1.0硬件）温度传感器布置位置不合理，测得的温度受芯片运行发热影响较大。已经在Rev1.2硬件中修复
+### 子项目文档
+- [主控器固件详解](code/MainController2/README.md)
+- [电源管理固件](code/PowerManage2/)
