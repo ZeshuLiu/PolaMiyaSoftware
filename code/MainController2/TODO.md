@@ -2,9 +2,52 @@
 
 生成时间：2026-03-20
 
+上次更新：2026-03-21 - LVGL 移植完成
+
+---
+
+## 新功能开发 - LVGL
+
+### [ ] LVGL-01 集成 LVGL 原生 Keypad 输入系统
+
+**目标**: 将当前自定义按键回调改为 LVGL 原生 keypad 输入设备
+
+**改动内容**:
+- 在 `lv_port_indev.c` 中实现 `keypad_read()` 函数
+- 将 3 个物理按键映射为 LVGL 键值：
+  - `KEY0` → `LV_KEY_ENTER` (确认/点击)
+  - `KEY1` → `LV_KEY_PREV` (上一个/左)
+  - `KEY2` → `LV_KEY_NEXT` (下一个/右)
+- 创建 `lv_group_t` 焦点组管理可聚焦控件
+
+**好处**:
+- 按键自动触发按钮点击事件 (`LV_EVENT_CLICKED`)
+- 自动焦点切换和控件高亮
+- 更适合后续 UI 按钮开发
+
+**参考**: `Libs/lvgl/examples/porting/lv_port_indev.c`
+
+---
+
+### [ ] LVGL-02 UI 按钮功能开发
+
+- [ ] 电机启动/停止按钮
+- [ ] 设置菜单入口
+- [ ] 电量信息详情页
+- [ ] 焦距调节界面
+
+---
+
+### [ ] LVGL-03 性能优化
+
+- [ ] 调整 `lv_display` 缓冲区大小 (当前 10 行)
+- [ ] 优化刷新率，降低 CPU 占用
+- [ ] 考虑启用 DMA 加速 LCD 传输
+
 ---
 
 ## 优先级 P0 - 严重问题（建议立即修复）
+
 
 ### [x] P0-01 `main.c:60` - `tim2_int_mask` 缺少 volatile
 ### [x] P0-02 `main.c:93-94` - 未使用的调试变量
