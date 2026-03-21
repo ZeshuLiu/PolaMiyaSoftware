@@ -12,8 +12,8 @@
 
 #define DISP_HOR 280
 #define DISP_VER 240
-#define ZUI_BUF_LFRAC 20
-#define ZUI_BUF_LINES (DISP_VER / ZUI_BUF_LFRAC)
+#define ZUI_BUF_LFRAC 10
+#define ZUI_BUF_LINES (DISP_VER / ZUI_BUF_LFRAC) * 0
 #define ZUI_BUF_SIZE (ZUI_BUF_LINES * DISP_HOR * 2)
 
 extern uint16_t zui_pixel_buffer0[ZUI_BUF_LINES * DISP_HOR];

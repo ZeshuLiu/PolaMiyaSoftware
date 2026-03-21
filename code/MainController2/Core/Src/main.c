@@ -31,12 +31,16 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "lcd_usr.h"
-#include "zui.h"
+// #include "zui.h"
 #include "zui_usr.h"
 #include "tmp102.h"
 #include "sdm18.h"
 #include "eeprom.h"
 #include "DataStore.h"
+#include "lvgl.h"                // 它为整个LVGL提供了更完整的头文件引用
+#include "lvgl_usr.h"
+#include "lv_port_disp.h"        // LVGL的显示支持
+#include "lv_port_indev.h"       // LVGL的触屏支持
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -147,14 +151,31 @@ int main(void)
 
   // 屏幕显示初始化
   HAL_TIM_Base_Start_IT(&htim2);
-  zui_init();
+  LCD_BLK_Set();
+  // zui_init();
+  lvgl_init_ui();
+  // 按钮
+  lv_obj_t *myBtn = lv_btn_create(lv_scr_act());                               // 创建按钮; 父对象：当前活动屏幕
+  lv_obj_set_pos(myBtn, 10, 10);                                               // 设置坐标
+  lv_obj_set_size(myBtn, 120, 50);                                             // 设置大小
+  
+  // 按钮上的文本
+  lv_obj_t *label_btn = lv_label_create(myBtn);                                // 创建文本标签，父对象：上面的btn按钮
+  lv_obj_align(label_btn, LV_ALIGN_CENTER, 0, 0);                              // 对齐于：父对象
+  lv_label_set_text(label_btn, "Test");                                        // 设置标签的文本
 
-  zui_dirty_current_layer();
-  zui_render_current_layer();
+  // 独立的标签
+  lv_obj_t *myLabel = lv_label_create(lv_scr_act());                           // 创建文本标签; 父对象：当前活动屏幕
+  lv_label_set_text(myLabel, "Hello world!");                                  // 设置标签的文本
+  lv_obj_align(myLabel, LV_ALIGN_CENTER, 0, 0);                                // 对齐于：父对象
+  lv_obj_align_to(myBtn, myLabel, LV_ALIGN_OUT_TOP_MID, 0, -20);               // 对齐于：某对象
 
-  zui_set_current_layer(&normal_layer);
-  zui_dirty_current_layer();
-  zui_render_current_layer();
+  // zui_dirty_current_layer();
+  // zui_render_current_layer();
+
+  // zui_set_current_layer(&normal_layer);
+  // zui_dirty_current_layer();
+  // zui_render_current_layer();
 
   HAL_Delay(100);
   // sdm18_start_meter();
@@ -179,7 +200,7 @@ int main(void)
 			}
 			else{
 				HAL_GPIO_WritePin(KEY3_GPIO_Port, KEY3_Pin, GPIO_PIN_SET);
-				LCD_BLK_Clr();
+				// LCD_BLK_Clr();
 			}
 
       TMP102_ReadTemperature();
@@ -206,7 +227,8 @@ int main(void)
       tim2_int_mask &= (~TIM_INT200MS_MASK);
       if (motor_state_delay == 1 && motor_state == 0) motor_state_delay = 2;
       if (motor_state_delay == 2) motor_state_delay = 0;
-      zui_render_current_layer();
+      lv_timer_handler();
+      // zui_render_current_layer();
     }
 
     if ( (tim2_int_mask & TIM_INT300MS_MASK) != 0) {
