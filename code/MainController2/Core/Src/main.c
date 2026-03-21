@@ -70,6 +70,16 @@ extern UI_Element zui_elm_char12;
 extern UI_Element bat_elm_char16;
 extern UI_Element batnum_elm_char16;
 uint8_t shut_trig_stat = 0;
+
+/* LVGL 数据同步 */
+extern char lvgl_bat_vals[6];
+extern char lvgl_key_vals[4];
+extern char lvgl_distance_vals[6];
+extern char lvgl_core_temp_vals[3];
+extern char lvgl_board_temp_vals[3];
+extern char lvgl_rbc_vals[6];
+extern char lvgl_mtl_vals[6];
+extern char lvgl_stc_vals[6];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -154,21 +164,6 @@ int main(void)
   LCD_BLK_Set();
   // zui_init();
   lvgl_init_ui();
-  // 按钮
-  lv_obj_t *myBtn = lv_btn_create(lv_scr_act());                               // 创建按钮; 父对象：当前活动屏幕
-  lv_obj_set_pos(myBtn, 10, 10);                                               // 设置坐标
-  lv_obj_set_size(myBtn, 120, 50);                                             // 设置大小
-  
-  // 按钮上的文本
-  lv_obj_t *label_btn = lv_label_create(myBtn);                                // 创建文本标签，父对象：上面的btn按钮
-  lv_obj_align(label_btn, LV_ALIGN_CENTER, 0, 0);                              // 对齐于：父对象
-  lv_label_set_text(label_btn, "Test");                                        // 设置标签的文本
-
-  // 独立的标签
-  lv_obj_t *myLabel = lv_label_create(lv_scr_act());                           // 创建文本标签; 父对象：当前活动屏幕
-  lv_label_set_text(myLabel, "Hello world!");                                  // 设置标签的文本
-  lv_obj_align(myLabel, LV_ALIGN_CENTER, 0, 0);                                // 对齐于：父对象
-  lv_obj_align_to(myBtn, myLabel, LV_ALIGN_OUT_TOP_MID, 0, -20);               // 对齐于：某对象
 
   // zui_dirty_current_layer();
   // zui_render_current_layer();
@@ -228,6 +223,7 @@ int main(void)
       if (motor_state_delay == 1 && motor_state == 0) motor_state_delay = 2;
       if (motor_state_delay == 2) motor_state_delay = 0;
       lv_timer_handler();
+      lvgl_update_display();
       // zui_render_current_layer();
     }
 
@@ -352,6 +348,7 @@ void key_scan(void)
       USR_KEYs[i].key_action = 1;
     }
     zui_key_respond(&USR_KEYs[i]);
+    lvgl_on_key(USR_KEYs[i].key_index, USR_KEYs[i].key_action);
   }
 }
 /* USER CODE END 4 */
