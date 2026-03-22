@@ -14,4 +14,7 @@ code/MainController2/MDK-ARM/.vscode/c_cpp_properties.json
 code/MainController2/MDK-ARM/.clangd
 code/MainController2/MDK-ARM/MainController2.cbuild-idx.yml
 code/MainController2/MDK-ARM/RTE/_MainController2/RTE_Components.h
-.claude/
+.claude/*
+GuiGuider/*
+.gitignore
+SquareLineProj/*

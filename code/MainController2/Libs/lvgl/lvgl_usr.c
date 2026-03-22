@@ -154,6 +154,8 @@ void lvgl_init_ui()
     cal_scale_label = lv_label_create(main_cont);
     lv_label_set_text(cal_scale_label, "inf-7m-5m-4m-3.5m-3m-2.5m-2m-1.7m-1.5m-1.3m-1.2m-1.05m-1m");
     lv_obj_set_pos(cal_scale_label, 20, 200);
+    lv_obj_set_width(cal_scale_label, 240);
+    lv_label_set_long_mode(cal_scale_label, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
     lv_obj_add_style(cal_scale_label, &style_cal_scale, 0);
 
     /* 创建底部版权信息 (y=220) */
