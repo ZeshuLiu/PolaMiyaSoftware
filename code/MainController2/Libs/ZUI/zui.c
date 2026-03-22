@@ -1,9 +1,10 @@
 #include "zui.h"
 #include "string.h"
+#include <stdint.h>
 #include <string.h>
 
 
-uint16_t zui_pixel_buffer0[ZUI_BUF_LINES * DISP_HOR];
+uint16_t zui_pixel_buffer0[ZUI_BUF_LINES * DISP_HOR * 1];
 
 UI_Layer *current_layer = NULL;
 
@@ -123,19 +124,31 @@ void zui_key_respond(USR_KEY * key)
 void char_12_elm_render(struct UI_Element *el, uint16_t *buf)
 {
     uint32_t bufi = 0;
+    uint32_t col_cnt = 0;
     uint16_t sizex = (el->usr_data_len-1) * 7;
     uint16_t num_char = (el->usr_data_len-1);
     uint8_t tmp;
     char *str = (char *)(el->user_data);  // 强制转换
 
     for (int row = 0; row < 12; row++) {
+        col_cnt = 0;
         for (int chari = 0; chari<num_char; chari++){
             tmp = ascii_1206[str[chari] - ' '] [row];
             for(uint8_t t=0;t<6;t++){
                 if(tmp&(0x01<<t)) buf[bufi++] = NORMAL_LAYER_FORE;
                 else buf[bufi++] = NORMAL_LAYER_BACK;
+                if ((col_cnt++)+el->x>=DISP_HOR){
+                    break;
+                }
             }
             buf[bufi++] = NORMAL_LAYER_BACK;
+            if ((col_cnt++)+el->x>=DISP_HOR){
+                break;
+            }
+        }
+        // 截断后调整 sizex
+        if (col_cnt < sizex) {
+            sizex = col_cnt;
         }
     }
     LCD_DrawArea(el->x,el->y, el->x + sizex - 1, el->y + 11, buf);

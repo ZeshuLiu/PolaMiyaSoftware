@@ -31,12 +31,16 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "lcd_usr.h"
-#include "zui.h"
+// #include "zui.h"
 #include "zui_usr.h"
 #include "tmp102.h"
 #include "sdm18.h"
 #include "eeprom.h"
 #include "DataStore.h"
+#include "lvgl.h"                // 它为整个LVGL提供了更完整的头文件引用
+#include "lvgl_usr.h"
+#include "lv_port_disp.h"        // LVGL的显示支持
+#include "lv_port_indev.h"       // LVGL的触屏支持
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -66,6 +70,16 @@ extern UI_Element zui_elm_char12;
 extern UI_Element bat_elm_char16;
 extern UI_Element batnum_elm_char16;
 uint8_t shut_trig_stat = 0;
+
+/* LVGL 数据同步 */
+extern char lvgl_bat_vals[6];
+extern char lvgl_key_vals[4];
+extern char lvgl_distance_vals[6];
+extern char lvgl_core_temp_vals[3];
+extern char lvgl_board_temp_vals[3];
+extern char lvgl_rbc_vals[6];
+extern char lvgl_mtl_vals[6];
+extern char lvgl_stc_vals[6];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -147,14 +161,16 @@ int main(void)
 
   // 屏幕显示初始化
   HAL_TIM_Base_Start_IT(&htim2);
-  zui_init();
+  LCD_BLK_Set();
+  // zui_init();
+  lvgl_init_ui();
 
-  zui_dirty_current_layer();
-  zui_render_current_layer();
+  // zui_dirty_current_layer();
+  // zui_render_current_layer();
 
-  zui_set_current_layer(&normal_layer);
-  zui_dirty_current_layer();
-  zui_render_current_layer();
+  // zui_set_current_layer(&normal_layer);
+  // zui_dirty_current_layer();
+  // zui_render_current_layer();
 
   HAL_Delay(100);
   // sdm18_start_meter();
@@ -179,7 +195,7 @@ int main(void)
 			}
 			else{
 				HAL_GPIO_WritePin(KEY3_GPIO_Port, KEY3_Pin, GPIO_PIN_SET);
-				LCD_BLK_Clr();
+				// LCD_BLK_Clr();
 			}
 
       TMP102_ReadTemperature();
@@ -206,7 +222,9 @@ int main(void)
       tim2_int_mask &= (~TIM_INT200MS_MASK);
       if (motor_state_delay == 1 && motor_state == 0) motor_state_delay = 2;
       if (motor_state_delay == 2) motor_state_delay = 0;
-      zui_render_current_layer();
+      lv_timer_handler();
+      lvgl_update_display();
+      // zui_render_current_layer();
     }
 
     if ( (tim2_int_mask & TIM_INT300MS_MASK) != 0) {
@@ -330,6 +348,7 @@ void key_scan(void)
       USR_KEYs[i].key_action = 1;
     }
     zui_key_respond(&USR_KEYs[i]);
+    lvgl_on_key(USR_KEYs[i].key_index, USR_KEYs[i].key_action);
   }
 }
 /* USER CODE END 4 */

@@ -22,6 +22,7 @@
 
 /* USER CODE BEGIN 0 */
 #include "motor.h"
+#include "lvgl.h"
 /* USER CODE END 0 */
 
 TIM_HandleTypeDef htim1;
@@ -314,24 +315,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   static uint32_t int2_cnt = 1;
 
   if (htim == (&htim2)){
-      int2_cnt++;
-      tim2_int_mask |= TIM_INT10MS_MASK;
+    lv_tick_inc(10);
+    int2_cnt++;
+    tim2_int_mask |= TIM_INT10MS_MASK;
 
-      if (int2_cnt % TIM_INTCNT_1S == 0){
-        tim2_int_mask |= TIM_INT1S_MASK;
-      }
+    if (int2_cnt % TIM_INTCNT_1S == 0){
+      tim2_int_mask |= TIM_INT1S_MASK;
+    }
 
-      if (int2_cnt % TIM_INTCNT_200MS == 0){
-        tim2_int_mask |= TIM_INT200MS_MASK;
-      }
+    if (int2_cnt % TIM_INTCNT_200MS == 0){
+      tim2_int_mask |= TIM_INT200MS_MASK;
+    }
 
-      if (int2_cnt % TIM_INTCNT_300MS == 0){
-        tim2_int_mask |= TIM_INT300MS_MASK;
-      }
+    if (int2_cnt % TIM_INTCNT_300MS == 0){
+      tim2_int_mask |= TIM_INT300MS_MASK;
+    }
 
-      // if (int2_cnt == TIM_INTCNT_MAX){
-      //   int2_cnt = 1;
-      // }
+    // if (int2_cnt == TIM_INTCNT_MAX){
+    //   int2_cnt = 1;
+    // }
   }
   if (htim == (&htim16))
   {

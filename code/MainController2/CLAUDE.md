@@ -40,6 +40,7 @@ STM32G474RETx 微控制器项目，使用 STM32CubeMX 生成配置，通过 Keil
 ├── HARDWARE/LCD/   # LCD 显示屏驱动 (280x240 分辨率)
 ├── Libs/           # 自定义功能库
 │   ├── ZUI/        # 自研 UI 框架 (轻量级嵌入式 GUI)
+│   ├── lvgl/       # LVGL 图形库 (已移植 v9，复刻 ZUI 显示)
 │   ├── TMP102/     # 温度传感器驱动
 │   ├── SDM18/      # 电量计量芯片驱动
 │   ├── Motors/     # 电机控制 (TIM16 PWM)
@@ -55,6 +56,13 @@ STM32G474RETx 微控制器项目，使用 STM32CubeMX 生成配置，通过 Keil
 - 双缓冲渲染 (280x12 行 x2 字节 = 6720 字节)
 - 支持按键响应 (短按/长按)
 - 主要 API: `zui_init()`, `zui_set_current_layer()`, `zui_render_current_layer()`
+
+**LVGL 移植** (`Libs/lvgl/`)
+- 已移植 LVGL v9 图形库，复刻了原 ZUI 的显示内容
+- 显示内容：BAT(电压), KEY(按键), DIS(距离), CTP(核心温度), BTP(板载温度), RBC/MTL/STC(计数)
+- 浮点数显示使用自定义函数 `lv_label_set_float()` 避免 printf 浮点格式化问题
+- 主要 API: `lvgl_init_ui()`, `lvgl_update_display()` (200ms 周期调用)
+- 配置：`lv_conf.h` 启用 12/16 号 Montserrat 字体
 
 **主循环架构** (`main.c`)
 - TIM2 定时器中断提供时间基准 (10ms/200ms/300ms/1s)
