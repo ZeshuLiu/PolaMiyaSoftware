@@ -15,6 +15,12 @@ code/MainController2/MDK-ARM/.clangd
 code/MainController2/MDK-ARM/MainController2.cbuild-idx.yml
 code/MainController2/MDK-ARM/RTE/_MainController2/RTE_Components.h
 .claude/*
-GuiGuider/*
+# GUI Guider - 提交自定义代码和生成的 UI 代码，忽略第三方库、模拟器和编译产物
+GuiGuider/*/lvgl/
+GuiGuider/*/lvgl-simulator/
+GuiGuider/*/ports/
+GuiGuider/*/temp/
+GuiGuider/*/.vscode/
+GuiGuider/*/lib/
+GuiGuider/*/build/
 .gitignore
-SquareLineProj/*
