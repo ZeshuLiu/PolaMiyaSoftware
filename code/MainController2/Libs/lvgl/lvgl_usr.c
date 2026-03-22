@@ -45,6 +45,7 @@ char lvgl_key_vals[4] = "x-x";
 char lvgl_distance_vals[6] = "xx.xx";
 char lvgl_core_temp_vals[3] = "xx";
 char lvgl_board_temp_vals[3] = "xx";
+char lvgl_batpercent_vals[5] = "xxxx";
 char lvgl_rbc_vals[6] = "00000";
 char lvgl_mtl_vals[6] = "00000";
 char lvgl_stc_vals[6] = "00000";
@@ -106,6 +107,19 @@ static void MainFun_RunTime_timer(lv_timer_t * timer)
         lv_snprintf(buf, sizeof(buf), "%d:%02d:%02d", hours, minutes, secs);
         lv_label_set_text(MainFun_RunTime, buf);
     }
+}
+
+float calc_bat_percent(float v)
+{
+    if (v >= 4.2) return 100;
+    if (v >= 4.0) return 85 + (v - 4.0) * 75;   // 快掉区
+    if (v >= 3.8) return 60 + (v - 3.8) * 125;
+    if (v >= 3.7) return 40 + (v - 3.7) * 200;  // 平台
+    if (v >= 3.6) return 25 + (v - 3.6) * 150;
+    if (v >= 3.5) return (v - 3.5) * 250;
+
+
+    return 0;
 }
 
 /* 自定义浮点标签函数 */
@@ -226,7 +240,7 @@ void lvgl_init_ui()
     /* ========== 创建第二界面 (MainFun) ========== */
     setup_scr_MainFun(&ui2);
 
-    lv_screen_load(main_cont);
+    lv_screen_load(ui2.MainFun);
 
     /* 启动运行时间计时器 */
     // lv_timer_create(MainFun_RunTime_timer, 1000, NULL);
@@ -426,16 +440,16 @@ void setup_scr_MainFun(lv_ui *ui)
 
     //Write codes MainFun_BatBar
     ui->MainFun_BatBar = lv_bar_create(ui->MainFun);
-    lv_obj_set_pos(ui->MainFun_BatBar, 205, 16);
-    lv_obj_set_size(ui->MainFun_BatBar, 59, 10);
+    lv_obj_set_pos(ui->MainFun_BatBar, 205, 11);
+    lv_obj_set_size(ui->MainFun_BatBar, 60, 14);
     lv_obj_set_style_anim_duration(ui->MainFun_BatBar, 1000, 0);
     lv_bar_set_mode(ui->MainFun_BatBar, LV_BAR_MODE_NORMAL);
     lv_bar_set_range(ui->MainFun_BatBar, 0, 100);
     lv_bar_set_value(ui->MainFun_BatBar, 50, LV_ANIM_OFF);
 
     //Write style for MainFun_BatBar, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
-    lv_obj_set_style_bg_opa(ui->MainFun_BatBar, 43, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(ui->MainFun_BatBar, lv_color_hex(0xffffff), LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui->MainFun_BatBar, 171, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(ui->MainFun_BatBar, lv_color_hex(0xe0e0e0), LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_bg_grad_dir(ui->MainFun_BatBar, LV_GRAD_DIR_NONE, LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_radius(ui->MainFun_BatBar, 10, LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_shadow_width(ui->MainFun_BatBar, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
@@ -515,8 +529,8 @@ void setup_scr_MainFun(lv_ui *ui)
     lv_chart_set_type(ui->MainFun_chart_1, LV_CHART_TYPE_LINE);
     lv_chart_set_div_line_count(ui->MainFun_chart_1, 3, 5);
     lv_chart_set_point_count(ui->MainFun_chart_1, 5);
-    lv_chart_set_range(ui->MainFun_chart_1, LV_CHART_AXIS_PRIMARY_Y, 0, 20);
-    lv_chart_set_range(ui->MainFun_chart_1, LV_CHART_AXIS_SECONDARY_Y, 0, 100);
+    lv_chart_set_range(ui->MainFun_chart_1, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
+    lv_chart_set_range(ui->MainFun_chart_1, LV_CHART_AXIS_SECONDARY_Y, 0, 40);
     lv_obj_set_style_size(ui->MainFun_chart_1, 0, 0, LV_PART_INDICATOR);
     ui->MainFun_chart_1_0 = lv_chart_add_series(ui->MainFun_chart_1, lv_color_hex(0xffffff), LV_CHART_AXIS_PRIMARY_Y);
 #if LV_USE_FREEMASTER == 0
@@ -706,7 +720,7 @@ void setup_scr_MainFun(lv_ui *ui)
     ui->MainFun_label_ChartUpper = lv_label_create(ui->MainFun);
     lv_obj_set_pos(ui->MainFun_label_ChartUpper, 8, 116);
     lv_obj_set_size(ui->MainFun_label_ChartUpper, 22, 10);
-    lv_label_set_text(ui->MainFun_label_ChartUpper, "20");
+    lv_label_set_text(ui->MainFun_label_ChartUpper, "40");
     lv_label_set_long_mode(ui->MainFun_label_ChartUpper, LV_LABEL_LONG_WRAP);
 
     //Write style for MainFun_label_ChartUpper, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
@@ -729,7 +743,7 @@ void setup_scr_MainFun(lv_ui *ui)
     ui->MainFun_label_ChartMiddle = lv_label_create(ui->MainFun);
     lv_obj_set_pos(ui->MainFun_label_ChartMiddle, 8, 131);
     lv_obj_set_size(ui->MainFun_label_ChartMiddle, 22, 10);
-    lv_label_set_text(ui->MainFun_label_ChartMiddle, "10");
+    lv_label_set_text(ui->MainFun_label_ChartMiddle, "20");
     lv_label_set_long_mode(ui->MainFun_label_ChartMiddle, LV_LABEL_LONG_WRAP);
 
     //Write style for MainFun_label_ChartMiddle, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
@@ -797,7 +811,7 @@ void setup_scr_MainFun(lv_ui *ui)
     //Write codes MainFun_label_STC
     ui->MainFun_label_STC = lv_label_create(ui->MainFun);
     lv_obj_set_pos(ui->MainFun_label_STC, 23, 71);
-    lv_obj_set_size(ui->MainFun_label_STC, 109, 13);
+    lv_obj_set_size(ui->MainFun_label_STC, 109, 14);
     lv_label_set_text(ui->MainFun_label_STC, "Shutter Count:");
     lv_label_set_long_mode(ui->MainFun_label_STC, LV_LABEL_LONG_WRAP);
 
@@ -818,27 +832,27 @@ void setup_scr_MainFun(lv_ui *ui)
     lv_obj_set_style_shadow_width(ui->MainFun_label_STC, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
 
     //Write codes MainFun_label_Val
-    ui->MainFun_label_Val = lv_label_create(ui->MainFun);
-    lv_obj_set_pos(ui->MainFun_label_Val, 129, 35);
-    lv_obj_set_size(ui->MainFun_label_Val, 60, 14);
-    lv_label_set_text(ui->MainFun_label_Val, "0");
-    lv_label_set_long_mode(ui->MainFun_label_Val, LV_LABEL_LONG_WRAP);
+    ui->MainFun_label_RBCVal = lv_label_create(ui->MainFun);
+    lv_obj_set_pos(ui->MainFun_label_RBCVal, 129, 35);
+    lv_obj_set_size(ui->MainFun_label_RBCVal, 60, 14);
+    lv_label_set_text(ui->MainFun_label_RBCVal, "0");
+    lv_label_set_long_mode(ui->MainFun_label_RBCVal, LV_LABEL_LONG_WRAP);
 
     //Write style for MainFun_label_Val, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
-    lv_obj_set_style_border_width(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(ui->MainFun_label_Val, lv_color_hex(0xffffff), LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui->MainFun_label_Val, &lv_font_montserratMedium_14, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui->MainFun_label_Val, 255, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_text_letter_space(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_text_line_space(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_text_align(ui->MainFun_label_Val, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_top(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_right(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_bottom(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_left(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_shadow_width(ui->MainFun_label_Val, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(ui->MainFun_label_RBCVal, lv_color_hex(0xffffff), LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui->MainFun_label_RBCVal, &lv_font_montserratMedium_14, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui->MainFun_label_RBCVal, 255, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_letter_space(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_line_space(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(ui->MainFun_label_RBCVal, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_top(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_right(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_bottom(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_left(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(ui->MainFun_label_RBCVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
 
     //Write codes MainFun_label_MTLVal
     ui->MainFun_label_MTLVal = lv_label_create(ui->MainFun);
@@ -866,7 +880,7 @@ void setup_scr_MainFun(lv_ui *ui)
     //Write codes MainFun_label_STCVal
     ui->MainFun_label_STCVal = lv_label_create(ui->MainFun);
     lv_obj_set_pos(ui->MainFun_label_STCVal, 129, 71);
-    lv_obj_set_size(ui->MainFun_label_STCVal, 40, 14);
+    lv_obj_set_size(ui->MainFun_label_STCVal, 60, 14);
     lv_label_set_text(ui->MainFun_label_STCVal, "0");
     lv_label_set_long_mode(ui->MainFun_label_STCVal, LV_LABEL_LONG_WRAP);
 
@@ -989,6 +1003,28 @@ void setup_scr_MainFun(lv_ui *ui)
     lv_obj_set_style_pad_left(ui->MainFun_label_DistVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_shadow_width(ui->MainFun_label_DistVal, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
 
+    //Write codes MainFun_label_BatPercent
+    ui->MainFun_label_BatPercent = lv_label_create(ui->MainFun);
+    lv_obj_set_pos(ui->MainFun_label_BatPercent, 211, 12);
+    lv_obj_set_size(ui->MainFun_label_BatPercent, 50, 12);
+    lv_label_set_text(ui->MainFun_label_BatPercent, "0%");
+    lv_label_set_long_mode(ui->MainFun_label_BatPercent, LV_LABEL_LONG_WRAP);
+
+    //Write style for MainFun_label_BatPercent, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
+    lv_obj_set_style_border_width(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(ui->MainFun_label_BatPercent, lv_color_hex(0x000000), LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui->MainFun_label_BatPercent, &lv_font_montserratMedium_12, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui->MainFun_label_BatPercent, 255, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_letter_space(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_line_space(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(ui->MainFun_label_BatPercent, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_top(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_right(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_bottom(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_left(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(ui->MainFun_label_BatPercent, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
     //The custom code of MainFun.
 
 
@@ -1062,8 +1098,9 @@ void lvgl_update_display(void)
     /* ========== 更新第二界面 ========== */
     if (current_screen == 1 || ui2.MainFun) {
         /* 更新电池电量 Bar */
-        if (ui2.MainFun_BatBar && BAT_V > 0.1f && BAT_V < 10.0f) {
-            int bat_percent = (int)((BAT_V - 3.0) / 1.2 * 100);  // 3.0V-4.2V 映射到 0-100%
+        if (ui2.MainFun_BatBar && BAT_V > -0.1f && BAT_V < 10.0f) {
+            // int bat_percent = (int)((BAT_V - 3.0) / 1.2 * 100);  // 3.0V-4.2V 映射到 0-100%
+            int bat_percent = (int)calc_bat_percent(BAT_V);
             if (bat_percent < 0) bat_percent = 0;
             if (bat_percent > 100) bat_percent = 100;
             lv_bar_set_value(ui2.MainFun_BatBar, bat_percent, LV_ANIM_OFF);
@@ -1075,28 +1112,52 @@ void lvgl_update_display(void)
             } else {
                 lv_obj_set_style_bg_color(ui2.MainFun_BatBar, lv_color_hex(0x00ff00), LV_PART_INDICATOR|LV_STATE_DEFAULT);
             }
+
+            /* 更新电量百分比显示 (0-100%) */
+            lvgl_batpercent_vals[0] = (bat_percent / 100) + '0';
+            lvgl_batpercent_vals[1] = ((bat_percent % 100) / 10) + '0';
+            lvgl_batpercent_vals[2] = (bat_percent % 10) + '0';
+            lvgl_batpercent_vals[3] = '%';
+            lvgl_batpercent_vals[4] = '\0';
+            if (ui2.MainFun_label_BatPercent) {
+                lv_label_set_text(ui2.MainFun_label_BatPercent, lvgl_batpercent_vals);
+            }
         }
-        lv_label_set_float(ui2.MainFun_label_STCVal, distance);
+
         /* 更新距离显示 */
         if (ui2.MainFun_label_DistVal && distance >= 0 && distance < 20.0f) {
-            char buf[10];
-            lv_snprintf(buf, sizeof(buf), "%.2f", distance);
-            lv_label_set_text(ui2.MainFun_label_DistVal, buf);
+            if (distance >= 0 && distance < 20.0f) {
+                lv_label_set_float(ui2.MainFun_label_DistVal, distance);
+                lv_strcpy(lvgl_distance_vals, lv_label_get_text(ui2.MainFun_label_DistVal));
+            }
+            else if (distance >= 20.0f){
+                lv_label_set_text(ui2.MainFun_label_DistVal, "Infinity");
+                lv_strcpy(lvgl_distance_vals, "Infinity");
+            }
+            else {
+                lv_label_set_text(ui2.MainFun_label_DistVal, "xx.xx");
+                lv_strcpy(lvgl_distance_vals, "xx.xx");
+            }
         }
 
-            /* 更新温度图表 */
-            if (ui2.MainFun_chart_1) {
-                static int temp_history[5] = {0, 0, 0, 0, 0};
-                static int temp_idx = 0;
+        /* 更新温度图表 */
+        if (ui2.MainFun_chart_1) {
+            static int temp_history[5] = {0, 0, 0, 0, 0};
+            static int temp_idx = 0;
 
-                /* 添加新温度值 */
-                int temp_val = (int)(temperature_cd * 10);  /* 放大 10 倍 */
-                temp_history[temp_idx] = temp_val;
-                temp_idx = (temp_idx + 1) % 5;
+            /* 添加新温度值 */
+            int temp_val = (int)(tmp102Temp);
+            temp_history[temp_idx] = temp_val;
+            temp_idx = (temp_idx + 1) % 5;
 
-                /* 更新图表数据 */
-                lv_chart_set_next_value(ui2.MainFun_chart_1, ui2.MainFun_chart_1_0, temp_val);
-            }
+            /* 更新图表数据 */
+            lv_chart_set_next_value(ui2.MainFun_chart_1, ui2.MainFun_chart_1_0, temp_val);
+        }
+
+        /* RBC/MTL/STC: 从 EEPROM 数据同步 */
+        if (ui2.MainFun_label_RBCVal) lv_label_set_text(ui2.MainFun_label_RBCVal, RBC_vals);
+        if (ui2.MainFun_label_MTLVal) lv_label_set_text(ui2.MainFun_label_MTLVal, MTL_vals);
+        if (ui2.MainFun_label_STCVal) lv_label_set_text(ui2.MainFun_label_STCVal, STC_vals);
     }
 }
 
@@ -1111,9 +1172,9 @@ void lvgl_on_key(uint8_t key_index, uint8_t key_action)
     }
 
     /* KEY2 短按切换界面 */
-    if (key_index == 2 && key_action == 1) {
+    if (key_index == 2 && key_action == 2) {
         current_screen = 1 - current_screen;  // 切换界面
-        if (current_screen == 0) {
+        if (current_screen == 1) {
             /* 加载主界面 */
             lv_screen_load(main_cont);
         } else {

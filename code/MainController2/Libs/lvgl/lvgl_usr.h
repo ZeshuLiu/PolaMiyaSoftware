@@ -37,7 +37,7 @@ typedef struct
 	lv_obj_t *MainFun_label_RBC;
 	lv_obj_t *MainFun_label_MTL;
 	lv_obj_t *MainFun_label_STC;
-	lv_obj_t *MainFun_label_Val;
+	lv_obj_t *MainFun_label_RBCVal;
 	lv_obj_t *MainFun_label_MTLVal;
 	lv_obj_t *MainFun_label_STCVal;
 	lv_obj_t *MainFun_line_5;
@@ -47,6 +47,7 @@ typedef struct
 	lv_obj_t *MainFun_line_9;
 	lv_obj_t *MainFun_line_10;
 	lv_obj_t *MainFun_label_DistVal;
+    lv_obj_t *MainFun_label_BatPercent;
 }lv_ui;
 
 void lvgl_init_ui(void);
