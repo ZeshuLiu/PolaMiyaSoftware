@@ -185,8 +185,6 @@ float calc_bat_percent(float v)
     if (v >= 3.7) return 40 + (v - 3.7) * 200;  // 平台
     if (v >= 3.6) return 25 + (v - 3.6) * 150;
     if (v >= 3.5) return (v - 3.5) * 250;
-
-
     return 0;
 }
 
