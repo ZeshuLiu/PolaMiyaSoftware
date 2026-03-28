@@ -64,6 +64,23 @@ STM32G474RETx 微控制器项目，使用 STM32CubeMX 生成配置，通过 Keil
 - 主要 API: `lvgl_init_ui()`, `lvgl_update_display()` (200ms 周期调用)
 - 配置：`lv_conf.h` 启用 12/16 号 Montserrat 字体
 
+**LVGL 显示优化** (`Libs/lvgl/examples/porting/lv_port_disp.c`)
+- 使用 SPI DMA 传输加速 LCD 刷新
+- `LCD_DrawArea()` 启动 DMA 传输，`HAL_SPI_TxCpltCallback()` 完成通知
+- 关键点：DMA 回调中调用 `lv_display_flush_ready()` 通知 LVGL 刷新完成
+- SPI 模式切换：传输前配置 16 位模式，回调中恢复 8 位模式
+
+**测距刻度动画** (`Libs/lvgl/lvgl_usr.c`)
+- `update_meter_labels()` 函数实现 5 个标签的动态位置更新
+- 使用 `MeterPosX`/`MeterPosY` 查表法实现圆弧滑动效果
+- 透明度根据标签 X 坐标渐变 (中心亮，边缘暗)
+- 异常情况 (distance<0) 显示 N/A，distance≥20 显示 INF
+
+**温度图表** (`Libs/lvgl/lvgl_usr.c`)
+- 维护 60 个数据点的环形缓冲区 `temp_history[60]`
+- 动态计算最大值/最小值，自动调整 Y 轴范围
+- 显示最大值、中位数、最小值标签
+
 **主循环架构** (`main.c`)
 - TIM2 定时器中断提供时间基准 (10ms/200ms/300ms/1s)
 - 状态机处理：按键扫描、ADC 采样、UI 刷新、电量计量
@@ -89,6 +106,10 @@ STM32G474RETx 微控制器项目，使用 STM32CubeMX 生成配置，通过 Keil
 2. **添加新模块**：在 `Libs/` 下创建，更新 `.cproject.yml` 的 include 路径和文件列表
 3. **UI 开发**：继承 ZUI 框架，定义 UI_Element 并实现 `render()` 回调
 4. **内存敏感**：嵌入式环境，注意栈/堆使用和 DMA 缓冲区对齐
+5. **LCD DMA 传输**：
+   - `LCD_DrawArea()` 使用 DMA 传输，不要在传输完成前修改像素缓冲区
+   - SPI 模式切换在 DMA 回调中完成，不要手动调用 `LCD_CS_Set()`
+   - DMA 缓冲区需要确保内存对齐 (32 位对齐)
 
 ## 相关文档
 
