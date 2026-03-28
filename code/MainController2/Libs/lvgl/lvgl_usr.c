@@ -2,6 +2,7 @@
 #include "lvgl.h"
 #include "lv_port_disp.h"
 #include "lv_port_indev.h"
+#include "widgets/label/lv_label.h"
 #include <stdint.h>
 
 #define lv_font_montserratMedium_16 lv_font_montserrat_16
@@ -124,10 +125,52 @@ static void MainFun_RunTime_timer(lv_timer_t * timer)
     uint32_t minutes = (runtime_seconds % 3600) / 60;
     uint32_t secs = runtime_seconds % 60;
 
-    if (MainFun_RunTime) {
+    if (ui2.MainFun_RunTime) {
         char buf[16];
         lv_snprintf(buf, sizeof(buf), "%d:%02d:%02d", hours, minutes, secs);
-        lv_label_set_text(MainFun_RunTime, buf);
+        lv_label_set_text(ui2.MainFun_RunTime, buf);
+    }
+
+    if (current_screen == 1 || ui2.MainFun){
+        /* 更新温度图表 */
+        if (ui2.MainFun_chart_1) {
+            static int temp_history[60] = {0};
+            static int temp_idx = 0;
+            static int data_count = 0;
+
+            /* 添加新温度值 */
+            int temp_val = (int)(tmp102Temp);
+            temp_history[temp_idx] = temp_val;
+            temp_idx = (temp_idx + 1) % 60;
+            if (data_count < 60) data_count++;
+
+            /* 更新图表数据 */
+            lv_chart_set_next_value(ui2.MainFun_chart_1, ui2.MainFun_chart_1_0, temp_val);
+
+            /* 计算 60 个数据中的最大值、最小值和中位数 */
+            int min_temp = temp_history[0], max_temp = temp_history[0];
+            for (int i = 0; i < data_count; i++) {
+                if (temp_history[i] < min_temp) min_temp = temp_history[i];
+                if (temp_history[i] > max_temp) max_temp = temp_history[i];
+            }
+            if (max_temp==min_temp){
+                max_temp += 1;
+                min_temp -= 1;
+            }
+            int mid_temp = (max_temp+min_temp) / 2;  /* 用平均值近似中位数 */
+
+            /* 设置 Y 轴范围 */
+            lv_chart_set_range(ui2.MainFun_chart_1, LV_CHART_AXIS_PRIMARY_Y, min_temp, max_temp);
+
+            /* 更新标签：最大值、中位数、最小值 */
+            char buf[8];
+            lv_snprintf(buf, sizeof(buf), "%d°C", max_temp);
+            lv_label_set_text(ui2.MainFun_label_ChartUpper, buf);
+            lv_snprintf(buf, sizeof(buf), "%d°C", mid_temp);
+            lv_label_set_text(ui2.MainFun_label_ChartMiddle, buf);
+            lv_snprintf(buf, sizeof(buf), "%d°C", min_temp);
+            lv_label_set_text(ui2.MainFun_label_CharTLower, buf);
+        }
     }
 }
 
@@ -521,8 +564,8 @@ void setup_scr_MainFun(lv_ui *ui)
     //Write codes MainFun_RunTime
     static bool MainFun_RunTime_timer_enabled = false;
     ui->MainFun_RunTime = lv_label_create(ui->MainFun);
-    lv_obj_set_pos(ui->MainFun_RunTime, 121, 13);
-    lv_obj_set_size(ui->MainFun_RunTime, 72, 18);
+    lv_obj_set_pos(ui->MainFun_RunTime, 115, 12);
+    lv_obj_set_size(ui->MainFun_RunTime, 90, 14);
     lv_label_set_text(ui->MainFun_RunTime, "0:00:00");
     if (!MainFun_RunTime_timer_enabled) {
         lv_timer_create(MainFun_RunTime_timer, 1000, NULL);
@@ -534,7 +577,7 @@ void setup_scr_MainFun(lv_ui *ui)
     lv_obj_set_style_radius(ui->MainFun_RunTime, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_shadow_width(ui->MainFun_RunTime, 0, LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(ui->MainFun_RunTime, lv_color_hex(0xffffff), LV_PART_MAIN|LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui->MainFun_RunTime, &lv_font_Antonio_Regular_16, LV_PART_MAIN|LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui->MainFun_RunTime, &lv_font_montserratMedium_14, LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui->MainFun_RunTime, 255, LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_text_letter_space(ui->MainFun_RunTime, 2, LV_PART_MAIN|LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui->MainFun_RunTime, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN|LV_STATE_DEFAULT);
@@ -550,7 +593,7 @@ void setup_scr_MainFun(lv_ui *ui)
     lv_obj_set_scrollbar_mode(ui->MainFun_chart_1, LV_SCROLLBAR_MODE_OFF);
     lv_chart_set_type(ui->MainFun_chart_1, LV_CHART_TYPE_LINE);
     lv_chart_set_div_line_count(ui->MainFun_chart_1, 3, 5);
-    lv_chart_set_point_count(ui->MainFun_chart_1, 5);
+    lv_chart_set_point_count(ui->MainFun_chart_1, 60);
     lv_chart_set_range(ui->MainFun_chart_1, LV_CHART_AXIS_PRIMARY_Y, 0, 40);
     lv_chart_set_range(ui->MainFun_chart_1, LV_CHART_AXIS_SECONDARY_Y, 0, 40);
     lv_obj_set_style_size(ui->MainFun_chart_1, 0, 0, LV_PART_INDICATOR);
@@ -604,7 +647,7 @@ void setup_scr_MainFun(lv_ui *ui)
     ui->MainFun_label_CharTime4 = lv_label_create(ui->MainFun);
     lv_obj_set_pos(ui->MainFun_label_CharTime4, 207, 164);
     lv_obj_set_size(ui->MainFun_label_CharTime4, 22, 10);
-    lv_label_set_text(ui->MainFun_label_CharTime4, "-10s");
+    lv_label_set_text(ui->MainFun_label_CharTime4, "0s");
     lv_label_set_long_mode(ui->MainFun_label_CharTime4, LV_LABEL_LONG_WRAP);
 
     //Write style for MainFun_label_CharTime4, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
@@ -627,7 +670,7 @@ void setup_scr_MainFun(lv_ui *ui)
     ui->MainFun_label_CharTime3 = lv_label_create(ui->MainFun);
     lv_obj_set_pos(ui->MainFun_label_CharTime3, 163, 164);
     lv_obj_set_size(ui->MainFun_label_CharTime3, 22, 10);
-    lv_label_set_text(ui->MainFun_label_CharTime3, "-20s");
+    lv_label_set_text(ui->MainFun_label_CharTime3, "-15s");
     lv_label_set_long_mode(ui->MainFun_label_CharTime3, LV_LABEL_LONG_WRAP);
 
     //Write style for MainFun_label_CharTime3, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
@@ -673,7 +716,7 @@ void setup_scr_MainFun(lv_ui *ui)
     ui->MainFun_label_CharTime1 = lv_label_create(ui->MainFun);
     lv_obj_set_pos(ui->MainFun_label_CharTime1, 72, 164);
     lv_obj_set_size(ui->MainFun_label_CharTime1, 31, 10);
-    lv_label_set_text(ui->MainFun_label_CharTime1, "-40s");
+    lv_label_set_text(ui->MainFun_label_CharTime1, "-45s");
     lv_label_set_long_mode(ui->MainFun_label_CharTime1, LV_LABEL_LONG_WRAP);
 
     //Write style for MainFun_label_CharTime1, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
@@ -696,7 +739,7 @@ void setup_scr_MainFun(lv_ui *ui)
     ui->MainFun_label_CharTime0 = lv_label_create(ui->MainFun);
     lv_obj_set_pos(ui->MainFun_label_CharTime0, 29, 164);
     lv_obj_set_size(ui->MainFun_label_CharTime0, 31, 10);
-    lv_label_set_text(ui->MainFun_label_CharTime0, "-50s");
+    lv_label_set_text(ui->MainFun_label_CharTime0, "-60s");
     lv_label_set_long_mode(ui->MainFun_label_CharTime0, LV_LABEL_LONG_WRAP);
 
     //Write style for MainFun_label_CharTime0, Part: LV_PART_MAIN, State: LV_STATE_DEFAULT.
@@ -1235,20 +1278,6 @@ void lvgl_update_display(void)
 
         /* 更新测距刻度标签 (动态位置) */
         update_meter_labels(distance);
-
-        /* 更新温度图表 */
-        if (ui2.MainFun_chart_1) {
-            static int temp_history[5] = {0, 0, 0, 0, 0};
-            static int temp_idx = 0;
-
-            /* 添加新温度值 */
-            int temp_val = (int)(tmp102Temp);
-            temp_history[temp_idx] = temp_val;
-            temp_idx = (temp_idx + 1) % 5;
-
-            /* 更新图表数据 */
-            lv_chart_set_next_value(ui2.MainFun_chart_1, ui2.MainFun_chart_1_0, temp_val);
-        }
 
         /* RBC/MTL/STC: 从 EEPROM 数据同步 */
         if (ui2.MainFun_label_RBCVal) lv_label_set_text(ui2.MainFun_label_RBCVal, RBC_vals);

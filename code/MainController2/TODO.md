@@ -10,22 +10,7 @@
 
 ---
 
-### [x] LVGL-01 测距动画完成
-
-**完成时间**: 2026-03-28
-
-**实现内容**:
-- 5 个标签 (DistDash0-4) 根据实测距离动态更新位置
-- 标签内容从 MeterGridChar 数组获取
-- 透明度根据 X 坐标自动渐变 (中心亮，边缘暗)
-- 异常情况 (distance<0) 显示 N/A，distance≥20 显示 INF
-
-**关键函数**: `update_meter_labels(float distance)` - `Libs/lvgl/lvgl_usr.c:1058`
-
-**数据结构**:
-- `MeterGrid[18]` - 测距标称值数组
-- `MeterGridChar[19]` - 显示字符串数组
-- `MeterPosX/MeterPosY[5][28]` - 位置查表
+### [x] LVGL-01 测距动画
 
 ### [ ] LVGL-02 UI 按钮功能开发
 
