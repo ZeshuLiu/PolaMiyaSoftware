@@ -157,6 +157,9 @@ static void MainFun_RunTime_timer(lv_timer_t * timer)
                 max_temp += 1;
                 min_temp -= 1;
             }
+            if (max_temp==min_temp+1){
+                min_temp -= 1;
+            }
             int mid_temp = (max_temp+min_temp) / 2;  /* 用平均值近似中位数 */
 
             /* 设置 Y 轴范围 */
@@ -1261,14 +1264,14 @@ void lvgl_update_display(void)
         }
 
         /* 更新距离显示 */
-        if (ui2.MainFun_label_DistVal && distance >= 0 && distance < 20.0f) {
+        if (ui2.MainFun_label_DistVal && distance >= 0) {
             if (distance >= 0 && distance < 20.0f) {
                 lv_label_set_float(ui2.MainFun_label_DistVal, distance);
                 lv_strcpy(lvgl_distance_vals, lv_label_get_text(ui2.MainFun_label_DistVal));
             }
             else if (distance >= 20.0f){
-                lv_label_set_text(ui2.MainFun_label_DistVal, "Infinity");
-                lv_strcpy(lvgl_distance_vals, "Infinity");
+                lv_label_set_text(ui2.MainFun_label_DistVal, "Inf");
+                lv_strcpy(lvgl_distance_vals, "Inf");
             }
             else {
                 lv_label_set_text(ui2.MainFun_label_DistVal, "xx.xx");
