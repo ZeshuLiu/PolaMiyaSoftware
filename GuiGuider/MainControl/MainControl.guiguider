@@ -535,7 +535,7 @@
 					"name": "line_10",
 					"id": "f4d3mbll",
 					"type": "line",
-					"left": 9,
+					"left": 0,
 					"top": 28,
 					"visible": true,
 					"isLock": false,
@@ -550,7 +550,7 @@
 							"p2": 0
 						},
 						{
-							"p1": 20,
+							"p1": 30,
 							"p2": 0
 						}
 					],
@@ -570,8 +570,8 @@
 					"name": "line_9",
 					"id": "fmliu78d",
 					"type": "line",
-					"left": 9,
-					"top": 23,
+					"left": 0,
+					"top": 22,
 					"visible": true,
 					"isLock": false,
 					"rm_flag": [],
@@ -585,7 +585,7 @@
 							"p2": 0
 						},
 						{
-							"p1": 20,
+							"p1": 30,
 							"p2": 0
 						}
 					],
@@ -605,8 +605,8 @@
 					"name": "line_8",
 					"id": "to7vxkru",
 					"type": "line",
-					"left": 9,
-					"top": 17,
+					"left": 0,
+					"top": 16,
 					"visible": true,
 					"isLock": false,
 					"rm_flag": [],
@@ -620,7 +620,7 @@
 							"p2": 0
 						},
 						{
-							"p1": 20,
+							"p1": 30,
 							"p2": 0
 						}
 					],
@@ -640,8 +640,8 @@
 					"name": "line_7",
 					"id": "m5ss7lbh",
 					"type": "line",
-					"left": 9,
-					"top": 12,
+					"left": 0,
+					"top": 10,
 					"visible": true,
 					"isLock": false,
 					"rm_flag": [],
@@ -655,7 +655,7 @@
 							"p2": 0
 						},
 						{
-							"p1": 20,
+							"p1": 30,
 							"p2": 0
 						}
 					],
@@ -675,8 +675,8 @@
 					"name": "line_6",
 					"id": "5t5tf2ze",
 					"type": "line",
-					"left": 9,
-					"top": 7,
+					"left": 0,
+					"top": 4,
 					"visible": true,
 					"isLock": false,
 					"rm_flag": [],
@@ -690,7 +690,7 @@
 							"p2": 0
 						},
 						{
-							"p1": 20,
+							"p1": 30,
 							"p2": 0
 						}
 					],
@@ -719,6 +719,16 @@
 					"width": 280,
 					"height": 1,
 					"default_style": false,
+					"line_points": [
+						{
+							"p1": 0,
+							"p2": 0
+						},
+						{
+							"p1": 240,
+							"p2": 0
+						}
+					],
 					"style": [
 						{
 							"part": "LV_PART_MAIN",
@@ -728,16 +738,6 @@
 							"line_width": 1,
 							"line_opa": 255,
 							"line_rounded": true
-						}
-					],
-					"line_points": [
-						{
-							"p1": 0,
-							"p2": 0
-						},
-						{
-							"p1": 240,
-							"p2": 0
 						}
 					]
 				},
@@ -2359,72 +2359,16 @@
 					"width": 201,
 					"height": 48,
 					"default_style": false,
-					"custom_attribute": [
-						""
-					],
-					"attribute_type": "freemaster",
-					"style": [
-						{
-							"part": "LV_PART_MAIN",
-							"state": "LV_STATE_DEFAULT",
-							"disable": false,
-							"border_side": [
-								"LV_BORDER_SIDE_FULL"
-							],
-							"border_width": 1,
-							"border_opa": 198,
-							"border_color": "#e8e8e8",
-							"radius": 0,
-							"bg_color": "#000000",
-							"bg_grad_color": "#ffffff",
-							"bg_opa": 255,
-							"bg_grad_dir": "LV_GRAD_DIR_NONE",
-							"bg_main_stop": 0,
-							"bg_grad_stop": 255,
-							"shadow_color": "#2195f6",
-							"shadow_opa": 255,
-							"shadow_width": 0,
-							"shadow_spread": 0,
-							"shadow_ofs_x": 0,
-							"shadow_ofs_y": 0,
-							"line_color": "#e8e8e8",
-							"line_width": 1,
-							"line_opa": 73
-						},
-						{
-							"part": "LV_PART_MAIN",
-							"state": "LV_STATE_FOCUSED",
-							"disable": true,
-							"border_side": [
-								"LV_BORDER_SIDE_FULL"
-							],
-							"border_width": 1,
-							"border_opa": 255,
-							"border_color": "#e8e8e8",
-							"radius": 0,
-							"bg_color": "#ffffff",
-							"bg_grad_color": "#ffffff",
-							"bg_opa": 255,
-							"bg_grad_dir": "LV_GRAD_DIR_NONE",
-							"bg_main_stop": 0,
-							"bg_grad_stop": 255,
-							"shadow_color": "#2195f6",
-							"shadow_opa": 255,
-							"shadow_width": 0,
-							"shadow_spread": 0,
-							"shadow_ofs_x": 0,
-							"shadow_ofs_y": 0,
-							"line_color": "#7d8490",
-							"line_width": 2,
-							"line_opa": 255
-						}
-					],
 					"scrollbar_mode": "OFF",
 					"row": 3,
 					"col": 5,
 					"point_count": 5,
 					"chart_type": "LV_CHART_TYPE_LINE",
 					"hide_point": true,
+					"attribute_type": "freemaster",
+					"custom_attribute": [
+						""
+					],
 					"axis_tick": [
 						{
 							"axis_name": "LV_CHART_AXIS_PRIMARY_Y",
@@ -2450,53 +2394,112 @@
 							"chart_axis": "LV_CHART_AXIS_PRIMARY_Y",
 							"desc": "Temperature"
 						}
+					],
+					"style": [
+						{
+							"part": "LV_PART_MAIN",
+							"state": "LV_STATE_DEFAULT",
+							"disable": false,
+							"bg_color": "#000000",
+							"bg_grad_color": "#ffffff",
+							"bg_grad_dir": "LV_GRAD_DIR_NONE",
+							"bg_main_stop": 0,
+							"bg_grad_stop": 255,
+							"bg_opa": 255,
+							"border_side": [
+								"LV_BORDER_SIDE_FULL"
+							],
+							"border_width": 1,
+							"border_color": "#e8e8e8",
+							"border_opa": 198,
+							"radius": 0,
+							"line_color": "#e8e8e8",
+							"line_width": 1,
+							"line_opa": 73,
+							"shadow_color": "#2195f6",
+							"shadow_opa": 255,
+							"shadow_width": 0,
+							"shadow_spread": 0,
+							"shadow_ofs_x": 0,
+							"shadow_ofs_y": 0
+						},
+						{
+							"part": "LV_PART_MAIN",
+							"state": "LV_STATE_FOCUSED",
+							"disable": true,
+							"border_side": [
+								"LV_BORDER_SIDE_FULL"
+							],
+							"border_width": 1,
+							"border_color": "#e8e8e8",
+							"border_opa": 255,
+							"bg_color": "#ffffff",
+							"bg_grad_color": "#ffffff",
+							"bg_grad_dir": "LV_GRAD_DIR_NONE",
+							"bg_main_stop": 0,
+							"bg_grad_stop": 255,
+							"bg_opa": 255,
+							"radius": 0,
+							"line_color": "#7d8490",
+							"line_width": 2,
+							"line_opa": 255,
+							"shadow_color": "#2195f6",
+							"shadow_opa": 255,
+							"shadow_width": 0,
+							"shadow_spread": 0,
+							"shadow_ofs_x": 0,
+							"shadow_ofs_y": 0
+						}
 					]
 				},
 				{
 					"name": "RunTime",
 					"id": "usk98glt",
 					"type": "digital_clock",
-					"left": 121,
-					"top": 13,
+					"left": 115,
+					"top": 12,
 					"visible": true,
 					"isLock": false,
 					"rm_flag": [],
 					"flag": [],
-					"width": 72,
-					"height": 18,
+					"width": 90,
+					"height": 14,
 					"default_style": false,
+					"inital_time": "00:00:00",
+					"show_second": true,
+					"use_ampm": false,
 					"style": [
 						{
 							"part": "LV_PART_MAIN",
 							"state": "LV_STATE_DEFAULT",
 							"disable": false,
+							"radius": 0,
+							"text_align": "LV_TEXT_ALIGN_CENTER",
+							"text_color": "#ffffff",
+							"font": 14,
+							"font_family": "Antonio_Regular",
+							"letter_space": 2,
 							"bg_color": "#292929",
 							"bg_grad_color": "#2195f6",
+							"bg_opa": 0,
 							"bg_grad_dir": "LV_GRAD_DIR_NONE",
 							"bg_main_stop": 0,
 							"bg_grad_stop": 255,
-							"bg_opa": 0,
-							"radius": 0,
+							"padding_top": 0,
+							"padding_right": 0,
+							"padding_bottom": 0,
+							"padding_left": 0,
 							"shadow_color": "#0d4b3b",
 							"shadow_opa": 255,
 							"shadow_width": 0,
 							"shadow_spread": 0,
 							"shadow_ofs_x": 0,
 							"shadow_ofs_y": 0,
-							"text_align": "LV_TEXT_ALIGN_CENTER",
-							"text_color": "#ffffff",
-							"font": 16,
-							"font_family": "Antonio_Regular",
-							"letter_space": 2,
-							"bg_dither_mode": "LV_DITHER_NONE",
-							"padding_top": 0,
-							"padding_right": 0,
-							"padding_bottom": 0,
-							"padding_left": 0,
-							"color_format": "RGB565A8",
-							"dither_algorithm": "",
-							"bg_img_storage": "",
 							"bg_img_src": "",
+							"dither_algorithm": "",
+							"compress_method": "NONE",
+							"bg_img_storage": "",
+							"color_format": "RGB565A8",
 							"bg_img_opa": 255,
 							"bg_img_recolor": "#ffffff",
 							"bg_img_recolor_opa": 0
@@ -2505,41 +2508,38 @@
 							"part": "LV_PART_MAIN",
 							"state": "LV_STATE_DISABLED",
 							"disable": true,
+							"radius": 0,
+							"text_align": "LV_TEXT_ALIGN_CENTER",
+							"text_color": "#ffffff",
+							"font": 16,
+							"font_family": "montserratMedium",
+							"letter_space": 0,
 							"bg_color": "#2195f6",
 							"bg_grad_color": "#2195f6",
+							"bg_opa": 255,
 							"bg_grad_dir": "LV_GRAD_DIR_NONE",
 							"bg_main_stop": 0,
 							"bg_grad_stop": 255,
-							"bg_opa": 255,
-							"radius": 0,
+							"padding_top": 7,
+							"padding_right": 0,
+							"padding_bottom": 0,
+							"padding_left": 0,
 							"shadow_color": "#2195f6",
 							"shadow_opa": 255,
 							"shadow_width": 0,
 							"shadow_spread": 0,
 							"shadow_ofs_x": 0,
 							"shadow_ofs_y": 0,
-							"text_align": "LV_TEXT_ALIGN_CENTER",
-							"text_color": "#ffffff",
-							"font": 16,
-							"font_family": "montserratMedium",
-							"letter_space": 0,
-							"bg_dither_mode": "LV_DITHER_NONE",
-							"padding_top": 7,
-							"padding_right": 0,
-							"padding_bottom": 0,
-							"padding_left": 0,
-							"color_format": "RGB565A8",
-							"dither_algorithm": "",
-							"bg_img_storage": "",
 							"bg_img_src": "",
+							"dither_algorithm": "",
+							"compress_method": "NONE",
+							"bg_img_storage": "",
+							"color_format": "RGB565A8",
 							"bg_img_opa": 255,
 							"bg_img_recolor": "#ffffff",
 							"bg_img_recolor_opa": 0
 						}
-					],
-					"inital_time": "00:00:00",
-					"show_second": true,
-					"use_ampm": false
+					]
 				},
 				{
 					"name": "ProjName",
@@ -2554,99 +2554,99 @@
 					"width": 75,
 					"height": 18,
 					"default_style": false,
+					"text": "PolaMiya ",
+					"is_static": false,
+					"long_mode": "LV_LABEL_LONG_WRAP",
+					"custom_attribute": [],
+					"attribute_type": "",
 					"style": [
 						{
 							"part": "LV_PART_MAIN",
 							"state": "LV_STATE_DEFAULT",
 							"disable": false,
-							"radius": 0,
-							"text_align": "LV_TEXT_ALIGN_LEFT",
-							"text_color": "#ffffff",
-							"font": 16,
-							"font_family": "montserratMedium",
-							"letter_space": 0,
-							"bg_color": "#2195f6",
-							"bg_grad_color": "#2195f6",
-							"bg_opa": 0,
-							"bg_main_stop": 0,
-							"bg_grad_stop": 255,
-							"bg_grad_dir": "LV_GRAD_DIR_NONE",
-							"padding_top": 0,
-							"padding_right": 0,
-							"padding_bottom": 0,
-							"padding_left": 0,
-							"shadow_color": "#2195f6",
-							"shadow_opa": 255,
-							"shadow_width": 0,
-							"shadow_spread": 0,
-							"shadow_ofs_x": 0,
-							"shadow_ofs_y": 0,
-							"color_format": "RGB565A8",
-							"dither_algorithm": "",
-							"bg_img_storage": "",
-							"bg_img_src": "",
-							"bg_img_opa": 255,
-							"bg_img_recolor": "#ffffff",
-							"bg_img_recolor_opa": 0,
 							"border_side": [
 								"LV_BORDER_SIDE_FULL"
 							],
 							"border_width": 0,
 							"border_opa": 255,
 							"border_color": "#2195f6",
+							"radius": 0,
+							"text_color": "#ffffff",
 							"text_opa": 255,
+							"font": 16,
+							"text_align": "LV_TEXT_ALIGN_LEFT",
+							"font_family": "montserratMedium",
+							"letter_space": 0,
 							"line_space": 0,
-							"compress_method": "NONE"
+							"bg_color": "#2195f6",
+							"bg_grad_color": "#2195f6",
+							"bg_opa": 0,
+							"bg_grad_dir": "LV_GRAD_DIR_NONE",
+							"bg_main_stop": 0,
+							"bg_grad_stop": 255,
+							"padding_top": 0,
+							"padding_right": 0,
+							"padding_bottom": 0,
+							"padding_left": 0,
+							"bg_img_src": "",
+							"dither_algorithm": "",
+							"compress_method": "NONE",
+							"bg_img_storage": "",
+							"color_format": "RGB565A8",
+							"bg_img_opa": 255,
+							"bg_img_recolor": "#ffffff",
+							"bg_img_recolor_opa": 0,
+							"shadow_color": "#2195f6",
+							"shadow_opa": 255,
+							"shadow_width": 0,
+							"shadow_spread": 0,
+							"shadow_ofs_x": 0,
+							"shadow_ofs_y": 0
 						},
 						{
 							"part": "LV_PART_MAIN",
 							"state": "LV_STATE_DISABLED",
 							"disable": true,
-							"radius": 0,
-							"text_align": "LV_TEXT_ALIGN_CENTER",
-							"text_color": "#000000",
-							"font": 16,
-							"font_family": "montserratMedium",
-							"letter_space": 0,
-							"bg_color": "#2195f6",
-							"bg_grad_color": "#2195f6",
-							"bg_opa": 0,
-							"bg_main_stop": 0,
-							"bg_grad_stop": 255,
-							"bg_grad_dir": "LV_GRAD_DIR_NONE",
-							"padding_top": 0,
-							"padding_right": 0,
-							"padding_bottom": 0,
-							"padding_left": 0,
-							"shadow_color": "#2195f6",
-							"shadow_opa": 255,
-							"shadow_width": 0,
-							"shadow_spread": 0,
-							"shadow_ofs_x": 0,
-							"shadow_ofs_y": 0,
-							"color_format": "RGB565A8",
-							"dither_algorithm": "",
-							"bg_img_storage": "",
-							"bg_img_src": "",
-							"bg_img_opa": 255,
-							"bg_img_recolor": "#ffffff",
-							"bg_img_recolor_opa": 0,
 							"border_side": [
 								"LV_BORDER_SIDE_FULL"
 							],
 							"border_width": 0,
 							"border_opa": 255,
 							"border_color": "#2195f6",
+							"radius": 0,
+							"text_color": "#000000",
 							"text_opa": 255,
+							"font": 16,
+							"font_family": "montserratMedium",
+							"text_align": "LV_TEXT_ALIGN_CENTER",
+							"letter_space": 0,
 							"line_space": 0,
-							"compress_method": "NONE"
+							"bg_color": "#2195f6",
+							"bg_grad_color": "#2195f6",
+							"bg_opa": 0,
+							"bg_grad_dir": "LV_GRAD_DIR_NONE",
+							"bg_main_stop": 0,
+							"bg_grad_stop": 255,
+							"padding_top": 0,
+							"padding_right": 0,
+							"padding_bottom": 0,
+							"padding_left": 0,
+							"bg_img_src": "",
+							"dither_algorithm": "",
+							"compress_method": "NONE",
+							"bg_img_storage": "",
+							"color_format": "RGB565A8",
+							"bg_img_opa": 255,
+							"bg_img_recolor": "#ffffff",
+							"bg_img_recolor_opa": 0,
+							"shadow_color": "#2195f6",
+							"shadow_opa": 255,
+							"shadow_width": 0,
+							"shadow_spread": 0,
+							"shadow_ofs_x": 0,
+							"shadow_ofs_y": 0
 						}
-					],
-					"text": "PolaMiya ",
-					"is_static": false,
-					"long_mode": "LV_LABEL_LONG_WRAP",
-					"custom_attribute": [],
-					"attribute_type": ""
+					]
 				},
 				{
 					"name": "line_4",
@@ -2661,6 +2661,16 @@
 					"width": 280,
 					"height": 2,
 					"default_style": false,
+					"line_points": [
+						{
+							"p1": 0,
+							"p2": 0
+						},
+						{
+							"p1": 280,
+							"p2": 0
+						}
+					],
 					"style": [
 						{
 							"part": "LV_PART_MAIN",
@@ -2670,16 +2680,6 @@
 							"line_width": 1,
 							"line_opa": 255,
 							"line_rounded": true
-						}
-					],
-					"line_points": [
-						{
-							"p1": 0,
-							"p2": 0
-						},
-						{
-							"p1": 280,
-							"p2": 0
 						}
 					]
 				},
@@ -2696,6 +2696,15 @@
 					"width": 60,
 					"height": 14,
 					"default_style": false,
+					"animtime": 1000,
+					"bar_value": 50,
+					"bar_start_value": 30,
+					"range_s": 0,
+					"range_e": 100,
+					"anim": false,
+					"mode": "LV_BAR_MODE_NORMAL",
+					"attribute_type": "freemaster",
+					"custom_attribute": [],
 					"style": [
 						{
 							"part": "LV_PART_MAIN",
@@ -2743,16 +2752,7 @@
 							"bg_img_recolor": "#fddcdc",
 							"bg_img_recolor_opa": 255
 						}
-					],
-					"animtime": 1000,
-					"bar_value": 50,
-					"bar_start_value": 30,
-					"range_s": 0,
-					"range_e": 100,
-					"anim": false,
-					"mode": "LV_BAR_MODE_NORMAL",
-					"attribute_type": "freemaster",
-					"custom_attribute": []
+					]
 				},
 				{
 					"name": "line_3",
@@ -2767,6 +2767,16 @@
 					"width": 9,
 					"height": 12,
 					"default_style": false,
+					"line_points": [
+						{
+							"p1": 0,
+							"p2": 0
+						},
+						{
+							"p1": 0,
+							"p2": 2
+						}
+					],
 					"style": [
 						{
 							"part": "LV_PART_MAIN",
@@ -2776,16 +2786,6 @@
 							"line_width": 3,
 							"line_opa": 255,
 							"line_rounded": true
-						}
-					],
-					"line_points": [
-						{
-							"p1": 0,
-							"p2": 0
-						},
-						{
-							"p1": 0,
-							"p2": 2
 						}
 					]
 				},
@@ -2828,7 +2828,7 @@
 					"name": "label_DistDash0",
 					"id": "jwlmptga",
 					"type": "label",
-					"left": 23,
+					"left": 25,
 					"top": 202,
 					"visible": true,
 					"isLock": false,
@@ -2837,6 +2837,11 @@
 					"width": 30,
 					"height": 16,
 					"default_style": false,
+					"text": "3.5",
+					"is_static": false,
+					"long_mode": "LV_LABEL_LONG_WRAP",
+					"custom_attribute": [],
+					"attribute_type": "",
 					"style": [
 						{
 							"part": "LV_PART_MAIN",
@@ -2924,18 +2929,13 @@
 							"shadow_ofs_x": 0,
 							"shadow_ofs_y": 0
 						}
-					],
-					"text": "3.5",
-					"is_static": false,
-					"long_mode": "LV_LABEL_LONG_WRAP",
-					"custom_attribute": [],
-					"attribute_type": ""
+					]
 				},
 				{
 					"name": "label_DistDash4",
 					"id": "1hxwilbk",
 					"type": "label",
-					"left": 187,
+					"left": 185,
 					"top": 202,
 					"visible": true,
 					"isLock": false,
@@ -3479,6 +3479,16 @@
 					"width": 1,
 					"height": 210,
 					"default_style": false,
+					"line_points": [
+						{
+							"p1": 0,
+							"p2": 0
+						},
+						{
+							"p1": 0,
+							"p2": 210
+						}
+					],
 					"style": [
 						{
 							"part": "LV_PART_MAIN",
@@ -3489,19 +3499,12 @@
 							"line_opa": 255,
 							"line_rounded": true
 						}
-					],
-					"line_points": [
-						{
-							"p1": 0,
-							"p2": 0
-						},
-						{
-							"p1": 0,
-							"p2": 210
-						}
 					]
 				}
 			],
+			"event": {
+				"widget": {}
+			},
 			"style": [
 				{
 					"part": "LV_PART_MAIN",
@@ -3522,10 +3525,7 @@
 					"bg_img_recolor": "#ffffff",
 					"bg_img_recolor_opa": 0
 				}
-			],
-			"event": {
-				"widget": {}
-			}
+			]
 		}
 	],
 	"Application": {

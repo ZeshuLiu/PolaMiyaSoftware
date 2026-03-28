@@ -142,7 +142,7 @@ static void disp_flush(lv_display_t * disp_drv, const lv_area_t * area, uint8_t 
 
     /*IMPORTANT!!!
      *Inform the graphics library that you are ready with the flushing*/
-    lv_display_flush_ready(disp_drv);
+    // lv_display_flush_ready(disp_drv);
 }
 
 #else /*Enable this file at the top*/

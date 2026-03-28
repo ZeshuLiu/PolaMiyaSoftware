@@ -3,6 +3,9 @@
 
 #include "main.h"
 #include "lvgl.h"
+
+#define MeterPosResL 28
+
 typedef struct
 {
   
