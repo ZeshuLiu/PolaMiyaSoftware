@@ -218,6 +218,8 @@ int main(void)
           HAL_GPIO_WritePin(FLASH_Trig_GPIO_Port, FLASH_Trig_Pin, GPIO_PIN_RESET);
         }
       }
+      lv_timer_handler();
+      lvgl_update_display();
     }
 
     if ( (tim2_int_mask & TIM_INT200MS_MASK) != 0) {
@@ -234,8 +236,6 @@ int main(void)
 
     if ( (tim2_int_mask & TIM_INT50MS_MASK) != 0) {
       tim2_int_mask &= (~TIM_INT50MS_MASK);
-      lv_timer_handler();
-      lvgl_update_display();
     }
 
     /* USER CODE END WHILE */

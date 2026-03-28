@@ -21,7 +21,8 @@
 #include "spi.h"
 
 /* USER CODE BEGIN 0 */
-
+#include "lvgl.h"
+#include "lcd.h"
 /* USER CODE END 0 */
 
 SPI_HandleTypeDef hspi1;
@@ -286,5 +287,12 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* spiHandle)
 }
 
 /* USER CODE BEGIN 1 */
-
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi){
+  if (&hspi1 == hspi){
+    LCD_CS_Set();
+    hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+    hspi1.Instance->CR1&=~(1<<11);
+    lv_display_flush_ready(lv_display_get_default());
+  }
+}
 /* USER CODE END 1 */

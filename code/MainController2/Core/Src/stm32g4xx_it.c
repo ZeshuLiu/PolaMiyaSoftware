@@ -22,7 +22,6 @@
 #include "stm32g4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "lvgl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -328,7 +327,6 @@ void DMA1_Channel5_IRQHandler(void)
   /* USER CODE END DMA1_Channel5_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_spi1_tx);
   /* USER CODE BEGIN DMA1_Channel5_IRQn 1 */
-  lv_display_flush_ready(disp_drv);
   /* USER CODE END DMA1_Channel5_IRQn 1 */
 }
 
