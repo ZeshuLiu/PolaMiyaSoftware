@@ -2,6 +2,7 @@
 #include "lvgl.h"
 #include "lv_port_disp.h"
 #include "lv_port_indev.h"
+#include <stdint.h>
 
 #define lv_font_montserratMedium_16 lv_font_montserrat_16
 #define lv_font_Antonio_Regular_16 lv_font_montserrat_16
@@ -22,6 +23,27 @@ extern char keyval_vals[4];    // 来自 zui_usr.c
 /* 电机控制外部声明 */
 extern void motor_start(void);
 extern uint8_t motor_state_delay;
+
+/* 测距分度值设置 */
+// "inf(20)-7m-5m-4m-3.5m-3m-2.5m-2m-1.7m-1.5m-1.3m-1.2m-1.05m-1m"
+const float MeterGrid[18] = {-1,-1,1.0, 1.05, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 7.0, 20.0, 21, 21};
+
+const char MeterGridChar[19][6] = {"", "", "1.0", "1.05", "1.2", "1.3", "1.5", "1.7", "2.0",
+                                "2.5", "3.0", "3.5", "4.0", "5.0", "7.0", "INF","", "", "N/A"};
+
+const int16_t MeterPosX[5][MeterPosResL] =
+{{-14, -13, -11, -10, -8, -7, -5, -4, -2, -1, 1, 3, 4, 6, 7, 9, 11, 12, 14, 15, 17, 19, 20, 22, 24, 25, 27, 29},
+    {30, 32, 34, 36, 37, 39, 41, 42, 44, 46, 48, 49, 51, 53, 55, 56, 58, 60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 78},
+    {80, 81, 83, 85, 87, 89, 90, 92, 94, 96, 98, 100, 101, 103, 105, 107, 109, 110, 112, 114, 116, 118, 120, 121, 123, 125, 127, 129},
+    {130, 132, 134, 136, 138, 139, 141, 143, 145, 146, 148, 150, 152, 154, 155, 157, 159, 161, 162, 164, 166, 168, 169, 171, 173, 174, 176, 178},
+    {180, 181, 183, 185, 186, 188, 190, 191, 193, 195, 196, 198, 199, 201, 203, 204, 206, 207, 209, 211, 212, 214, 215, 217, 218, 220, 221, 223}};
+
+const int16_t MeterPosY[5][MeterPosResL] =
+{{224, 223, 222, 221, 220, 219, 218, 217, 216, 215, 214, 213, 212, 211, 210, 210, 209, 208, 207, 206, 205, 205, 204, 203, 203, 202, 201, 200},
+    {200, 199, 199, 198, 197, 197, 196, 196, 195, 195, 194, 194, 193, 193, 192, 192, 191, 191, 191, 190, 190, 189, 189, 189, 189, 188, 188, 188},
+    {188, 187, 187, 187, 187, 187, 187, 186, 186, 186, 186, 186, 186, 186, 186, 186, 186, 186, 186, 186, 186, 186, 187, 187, 187, 187, 187, 187},
+    {188, 188, 188, 188, 189, 189, 189, 189, 190, 190, 191, 191, 191, 192, 192, 193, 193, 194, 194, 195, 195, 196, 196, 197, 197, 198, 199, 199},
+    {200, 200, 201, 202, 203, 203, 204, 205, 205, 206, 207, 208, 209, 210, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223}};
 
 /* 第二界面对象引用 - MainFun */
 static lv_obj_t *screen2_cont = NULL;
@@ -111,8 +133,8 @@ static void MainFun_RunTime_timer(lv_timer_t * timer)
 
 float calc_bat_percent(float v)
 {
-    if (v >= 4.2) return 100;
-    if (v >= 4.0) return 85 + (v - 4.0) * 75;   // 快掉区
+    if (v >= 4.1) return 100;
+    if (v >= 4.0) return 85 + (v - 4.0) * 150;   // 快掉区
     if (v >= 3.8) return 60 + (v - 3.8) * 125;
     if (v >= 3.7) return 40 + (v - 3.7) * 200;  // 平台
     if (v >= 3.6) return 25 + (v - 3.6) * 150;
@@ -1033,6 +1055,77 @@ void setup_scr_MainFun(lv_ui *ui)
 
 }
 
+/* 更新测距刻度标签 - 根据实测距离动态更新 5 个标签的内容、位置和样式 */
+static void update_meter_labels(float distance)
+{
+    /* 标签对象数组 */
+    lv_obj_t *dist_labels[5] = {
+        ui2.MainFun_label_DistDash0,
+        ui2.MainFun_label_DistDash1,
+        ui2.MainFun_label_DistDash2,
+        ui2.MainFun_label_DistDash3,
+        ui2.MainFun_label_DistDash4
+    };
+
+    /* 处理异常情况，测距小于0 */
+    if (distance < 0.0f) {
+        /* 显示异常，所有标签显示 N/A，使用中心位置 */
+        for (int i = 0; i < 5; i++) {
+            if (dist_labels[i]) {
+                lv_label_set_text(dist_labels[i], "");
+                /* 使用分辨率索引 14 作为默认位置 */
+                lv_obj_set_pos(dist_labels[i], MeterPosX[i][14], MeterPosY[i][14]);
+                lv_obj_set_style_text_opa(dist_labels[i], 150, LV_PART_MAIN|LV_STATE_DEFAULT);
+            }
+        }
+        lv_label_set_text(dist_labels[2], MeterGridChar[18]);
+        return;
+    }
+
+    /* 测距大于20则认为处于无穷远 */
+    if (distance >= 20.0f) {
+        /* 显示异常，所有标签显示 N/A，使用中心位置 */
+        for (int i = 0; i < 5; i++) {
+            if (dist_labels[i]) {
+                lv_label_set_text(dist_labels[i], MeterGridChar[15+i]);
+                /* 使用分辨率索引 14 作为默认位置 */
+                lv_obj_set_pos(dist_labels[i], MeterPosX[i][14], MeterPosY[i][14]);
+                lv_obj_set_style_text_opa(dist_labels[i], (MeterPosX[i][14]>105)? (255-(MeterPosX[i][14]-105)) : (255-(105-MeterPosX[i][14])), LV_PART_MAIN|LV_STATE_DEFAULT);
+            }
+        }
+        return;
+    }
+
+    /* 判断此时的距离位于哪两个标度之间 */
+    uint8_t dis_upper = 0;
+    uint8_t dis_bias = 0;
+    for (dis_upper = 2; dis_upper < 16; dis_upper++)
+    {
+        if (distance < MeterGrid[dis_upper]){
+            dis_bias = (int) ((distance - MeterGrid[dis_upper-1])*28.0f/(MeterGrid[dis_upper] - MeterGrid[dis_upper-1]));
+            break;
+        }
+    }
+    if (dis_bias<14){
+        dis_upper -= 1;
+        dis_bias = 14-dis_bias;
+        // dis_bias += 14;
+    }
+    else{
+        dis_bias = 41-dis_bias;
+    }
+    if (dis_bias < 0) dis_bias = 0;
+    if (dis_bias > 27) dis_bias = 27;
+
+    for (int i = 0; i < 5; i++) {
+        if (dist_labels[i]) {
+            lv_label_set_text(dist_labels[i], MeterGridChar[dis_upper+i-2]);
+            /* 使用分辨率索引 14 作为默认位置 */
+            lv_obj_set_pos(dist_labels[i], MeterPosX[i][dis_bias], MeterPosY[i][dis_bias]);
+            lv_obj_set_style_text_opa(dist_labels[i], (MeterPosX[i][dis_bias]>105)? (255-(MeterPosX[i][dis_bias]-105)) : (255-(105-MeterPosX[i][dis_bias])), LV_PART_MAIN|LV_STATE_DEFAULT);
+        }
+    }
+}
 
 
 /* 更新显示内容 - 需要在主循环中调用 */
@@ -1139,6 +1232,9 @@ void lvgl_update_display(void)
                 lv_strcpy(lvgl_distance_vals, "xx.xx");
             }
         }
+
+        /* 更新测距刻度标签 (动态位置) */
+        update_meter_labels(distance);
 
         /* 更新温度图表 */
         if (ui2.MainFun_chart_1) {
