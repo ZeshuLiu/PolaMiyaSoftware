@@ -43,10 +43,12 @@ extern "C" {
 /* USER CODE BEGIN EC */
 // #define TIM_INTCNT_10MS       1                     // 10ms中断
 #define TIM_INT10MS_MASK      (0x02)
+#define TIM_INTCNT_50MS       (5)                     // 50ms中断
+#define TIM_INT50MS_MASK      (0x10)
 #define TIM_INTCNT_200MS       (20)                     // 200ms中断
 #define TIM_INT200MS_MASK      (0x04)
 #define TIM_INTCNT_1S         (100)               // 1s中断
-#define TIM_INT1S_MASK        0x01
+#define TIM_INT1S_MASK        (0x01)
 #define TIM_INTCNT_300MS         (30)               // 300ms中断
 #define TIM_INT300MS_MASK        (0x08)
 

@@ -1087,7 +1087,7 @@ static void update_meter_labels(float distance)
         /* 显示异常，所有标签显示 N/A，使用中心位置 */
         for (int i = 0; i < 5; i++) {
             if (dist_labels[i]) {
-                lv_label_set_text(dist_labels[i], MeterGridChar[15+i]);
+                lv_label_set_text(dist_labels[i], MeterGridChar[15+i-2]);
                 /* 使用分辨率索引 14 作为默认位置 */
                 lv_obj_set_pos(dist_labels[i], MeterPosX[i][14], MeterPosY[i][14]);
                 lv_obj_set_style_text_opa(dist_labels[i], (MeterPosX[i][14]>105)? (255-(MeterPosX[i][14]-105)) : (255-(105-MeterPosX[i][14])), LV_PART_MAIN|LV_STATE_DEFAULT);
