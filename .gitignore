@@ -25,3 +25,4 @@ GuiGuider/*/lib/
 GuiGuider/*/build/
 .gitignore
 code/FoucsUnit/FocusUnit/.mrs/88a790fe6005dfcc35c929245ddb001c-.snapshot
+/code/FocusUnit/Debug
