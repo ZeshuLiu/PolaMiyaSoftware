@@ -1,64 +1,37 @@
 # PolaMiyaSoftware - 宝丽来相机改装项目
 
-宝丽来相机自动化改装项目软件部分。
+宝丽来相机自动化改装项目的软件仓库。当前主控器为 PM_Controller Rev2.0，使用 ESP32-S3-WROOM-1-N16R8；第一代 STM32 固件保存在历史归档中。
 
-> 完整项目（含机械/电路设计）：https://github.com/ZeshuLiu/PolaMiya
+完整项目（含机械/电路设计）：https://github.com/ZeshuLiu/PolaMiya
 
-## 仓库结构
+版本对应与待核对项见[软件与 PCB 兼容性表](软件与PCB兼容性表.md)。
 
-| 子目录 | 说明 |
-|--------|------|
-| [code/MainController2](code/MainController2) | 主控器固件 (STM32G474) |
-| [code/PowerManage2](code/PowerManage2) | 电源管理固件 |
+## 仓库结构与硬件对应
 
-## 技术栈
+| 目录 | 对应硬件 / MCU | 状态 |
+| --- | --- | --- |
+| [code/PM_Controller](code/PM_Controller/) | 第二代主控器 PM_Controller Rev2.0 / ESP32-S3-WROOM-1-N16R8 | ST7789 屏幕测试工程，已配置双 OTA 分区 |
+| [code/FocusUnit](code/FocusUnit/) | 独立对焦组件 / STM32F030F4Px | 独立维护，兼容性按组件硬件版本确认 |
+| [code/Scripts](code/Scripts/) | 辅助计算脚本 | 按脚本用途使用 |
+| [archive/PM_Controller_Rev1_x](archive/PM_Controller_Rev1_x/) | 第一代主控系统 / STM32G474 + STM32L011 | 历史固件归档，不适用于第二代主控器 |
+| [GuiGuider/MainControl](GuiGuider/MainControl/) | 现有 GUI Guider 界面设计资源 | 保留原位置；用于新主控前需确认移植适配 |
 
-| 项目 | 主控器 (MainController2) | 电源管理 (PowerManage2) |
-|------|-------------------------|------------------------|
-| **MCU** | STM32G474RETx (Cortex-M4F) | STM32L011D4Px (Cortex-M0+) |
-| **IDE** | Keil MDK-ARM V5 / CMSIS 6 | Keil MDK-ARM V5 |
-| **编译器** | ARM Compiler 6 (AC6) | ARM Compiler 5 (AC5) |
-| **框架** | STM32CubeMX + HAL 库 | STM32CubeMX + HAL 库 |
-| **调试器** | ST-Link / pyOCD (SWD, 4MHz) | ST-Link (SWD) |
+## 开发入口
 
-## 烧录方法
+第二代主控器在 [code/PM_Controller](code/PM_Controller/README.md) 开发，使用 ESP-IDF 6.1。当前程序用于确认 ST7789 屏幕方向和偏移，驱动封装与测试代码分目录存放。引脚和双 OTA 分区已配置；电机、BLE、手动开启 Wi-Fi 和 OTA 业务后续实现。
 
-### 硬件连接
-```
-ST-Link V2    目标板
----------    -------
-3.3V         VCC
-GND          GND
-SWCLK        SWCLK
-SWDIO        SWDIO
-NRST         NRST
-```
+对焦组件的配置、模块接口、构建与验证记录见 [FocusUnit 工程说明](code/FocusUnit/AGENT.md)。它是独立组件，不随旧主控固件一起归档。
 
-### 使用 Keil Studio (VS Code)
-1. 在 VS Code 中打开 `code/MainController2` 文件夹
-2. 连接 ST-Link 调试器
-3. 按 `F5` 或点击运行/调试按钮烧录并启动调试
+## 第一代固件
 
-### 使用 Keil MDK-ARM
-1. 打开 `MDK-ARM/MainController2.uvprojx`
-2. 点击 **Download** 按钮烧录
+第一代的 `MainController` 和 `PowerManage` 完整工程放在 `archive/PM_Controller_Rev1_x/`。内部保留 `MainController2`、`PowerManage2` 的原工程名，以保留原构建配置；名称中的 `2` 不表示第二代主控硬件。适用范围与使用方法见[归档说明](archive/PM_Controller_Rev1_x/README.md)。
 
-### 使用命令行 (pyOCD)
-```bash
-# 主控器固件
-pyocd flash -t stm32g474 MDK-ARM/Objects/MainController2.hex
+硬件 PCB 版本与软件版本分别记录，不能仅凭目录名推断所有第一代板卡的兼容性。历史固件使用前应核对实际 PCB、引脚、电源管理和屏幕按键模块。
 
-# 电源管理固件
-pyocd flash -t stm32l011 code/PowerManage2/MDK-ARM/PowerManage2/PowerManage2.hex
-```
+## 目录整理记录
 
-## 使用方法
+2026-10-06：整理前快照为 `a72e7de`。旧主控和电源管理工程归档至 `archive/PM_Controller_Rev1_x/`，新建 ESP32-S3 工程、PCB 引脚定义、双 OTA 分区和 ST7789 屏幕测试。旧工程已跟踪的文件保留，新增缓存和本机设置不纳入 Git。当前屏幕方向、偏移及刷新速度尚未实测确认。
 
-### 相机操作
-- **开机/关机**：长按机身左下角按钮 2 秒
-- **吐片**：三向按钮长按中键 2 秒启动吐片电机，短按中键停止
-- **测距**：开机即运行
+## 许可证
 
-### 子项目文档
-- [主控器固件详解](code/MainController2/README.md)
-- [电源管理固件](code/PowerManage2/)
+见 [LICENSE.md](LICENSE.md)。

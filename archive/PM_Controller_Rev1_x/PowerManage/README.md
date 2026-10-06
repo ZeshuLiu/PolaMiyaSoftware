@@ -116,5 +116,5 @@ PowerManage2 <----> MainController2
 ## 相关文档
 
 - [STM32L011 参考手册](https://www.st.com/en/microcontrollers-microprocessors/stm32l011d4.html)
-- [项目主 README](../../ReadMe.md)
-- [主控制器固件](../MainController2/)
+- [项目主 README](../../../ReadMe.md)
+- [主控制器固件](../MainController/)

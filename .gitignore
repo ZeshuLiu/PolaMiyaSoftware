@@ -1,19 +1,19 @@
 ~$*
 
-code/PowerManage/MDK-ARM/out/PowerManage/PowerManage/.cache/*
-code/PowerManage/MDK-ARM/tmp/*
+archive/PM_Controller_Rev1_x/PowerManage/MDK-ARM/out/PowerManage/PowerManage/.cache/*
+archive/PM_Controller_Rev1_x/PowerManage/MDK-ARM/tmp/*
 电路/主控器/DispKey/DispKey-backups/*
 电路/主控器/PM_Controller/PM_Controller-backups/*
 电路/电机驱动/MotroDrive/MotroDrive-backups/*
 /过时
-code/MainController2/MDK-ARM/out/*
-code/MainController2/MDK-ARM/tmp/*
-code/MainController2/MDK-ARM/*.log
-code/MainController2/MDK-ARM/.vscode/keil-assistant.log
-code/MainController2/MDK-ARM/.vscode/c_cpp_properties.json
-code/MainController2/MDK-ARM/.clangd
-code/MainController2/MDK-ARM/MainController2.cbuild-idx.yml
-code/MainController2/MDK-ARM/RTE/_MainController2/RTE_Components.h
+archive/PM_Controller_Rev1_x/MainController/MDK-ARM/out/*
+archive/PM_Controller_Rev1_x/MainController/MDK-ARM/tmp/*
+archive/PM_Controller_Rev1_x/MainController/MDK-ARM/*.log
+archive/PM_Controller_Rev1_x/MainController/MDK-ARM/.vscode/keil-assistant.log
+archive/PM_Controller_Rev1_x/MainController/MDK-ARM/.vscode/c_cpp_properties.json
+archive/PM_Controller_Rev1_x/MainController/MDK-ARM/.clangd
+archive/PM_Controller_Rev1_x/MainController/MDK-ARM/MainController2.cbuild-idx.yml
+archive/PM_Controller_Rev1_x/MainController/MDK-ARM/RTE/_MainController2/RTE_Components.h
 .claude/*
 # GUI Guider - 提交自定义代码和生成的 UI 代码，忽略第三方库、模拟器和编译产物
 GuiGuider/*/lvgl/
@@ -23,6 +23,17 @@ GuiGuider/*/temp/
 GuiGuider/*/.vscode/
 GuiGuider/*/lib/
 GuiGuider/*/build/
-.gitignore
 code/FoucsUnit/FocusUnit/.mrs/88a790fe6005dfcc35c929245ddb001c-.snapshot
 /code/FocusUnit/Debug
+
+# Archived first-generation local build caches
+/archive/PM_Controller_Rev1_x/MainController/build/
+/archive/PM_Controller_Rev1_x/MainController/MDK-ARM/build/
+/archive/PM_Controller_Rev1_x/MainController/MDK-ARM/.cmsis/
+# Second-generation local build outputs
+/code/PM_Controller/build/
+/code/PM_Controller/sdkconfig.old
+
+# Local caches and logs
+.cache/
+debug.log

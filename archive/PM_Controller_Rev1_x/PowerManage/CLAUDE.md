@@ -65,5 +65,5 @@ STM32L011D4Px 微控制器项目 (Cortex-M0+), 使用 STM32CubeMX 生成配置�
 
 ## 相关项目
 
-- 主控制器固件：`code/MainController2/` (STM32G474)
+- 主控制器固件：`archive/PM_Controller_Rev1_x/MainController/` (STM32G474)
 - 完整项目：https://github.com/ZeshuLiu/PolaMiya

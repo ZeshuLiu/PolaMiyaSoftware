@@ -10,9 +10,9 @@ STM32G474RETx 微控制器项目，使用 STM32CubeMX 生成配置，通过 Keil
 
 ## Repository Context
 
-本项目已从原始 PolaMiyaSoftware 仓库剥离，当前为独立的代码仓库：
+本项目作为第一代历史固件保存在 PolaMiyaSoftware 仓库中：
 - **父仓库**: `PolaMiyaSoftware/` - 包含所有相机代码的整体项目
-- **当前仓库**: `PolaMiyaSoftware/code/MainController2/` - 主控器固件
+- **当前工程**: `PolaMiyaSoftware/archive/PM_Controller_Rev1_x/MainController/` - 主控器固件
 
 ## Build & Debug
 
