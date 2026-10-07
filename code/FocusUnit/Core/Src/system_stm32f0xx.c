@@ -43,6 +43,7 @@
   * @{
   */
 
+/* CMSIS 复位时钟支持；最终 48 MHz 业务时钟由 main.c 的 SystemClock_Config 设置。 */
 #include "stm32f0xx.h"
 
 /**
@@ -123,6 +124,7 @@ const uint8_t APBPrescTable[8]  = {0, 0, 0, 0, 1, 2, 3, 4};
   * @param  None
   * @retval None
   */
+/* 复位后、main 前执行：恢复基础时钟状态，随后应用再配置 PLL 和总线。 */
 void SystemInit(void)
 {
   /* NOTE :SystemInit(): This function is called at startup just after reset and 
@@ -175,6 +177,7 @@ void SystemInit(void)
   * @param  None
   * @retval None
   */
+/* 依据实际 RCC 寄存器更新 SystemCoreClock；只更新软件变量，不切换时钟。 */
 void SystemCoreClockUpdate (void)
 {
   uint32_t tmp = 0, pllmull = 0, pllsource = 0, predivfactor = 0;

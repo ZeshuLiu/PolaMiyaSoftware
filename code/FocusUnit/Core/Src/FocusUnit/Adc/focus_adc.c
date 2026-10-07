@@ -18,10 +18,11 @@ typedef struct
   uint8_t count;
 } FocusAdcRawFrame;
 
+/* ISR 写原始帧和事件标记，主循环消费并换算；完整帧接口便于后续替换 DMA 后端。 */
 static ADC_HandleTypeDef *s_hadc;
 static volatile uint8_t s_busy;
 static volatile uint8_t s_frame_complete;
-static volatile uint8_t s_async_error;
+static volatile uint8_t s_async_error; /* 0=无错误，1=HAL 错误，2=帧序/EOS 错误 */
 static volatile uint8_t s_frame_count;
 static volatile uint32_t s_started_at_ms;
 static volatile uint32_t s_sequence;
@@ -35,6 +36,7 @@ static FocusAdcMeasurement s_measurement;
 static uint8_t s_snapshot_available;
 static uint8_t s_initialized;
 
+/* 短临界区发布整帧，防止读取者看到一半新值、一半旧值。 */
 static void FocusAdc_CommitMeasurement(const FocusAdcMeasurement *measurement)
 {
   uint32_t primask = __get_PRIMASK();
@@ -44,17 +46,20 @@ static void FocusAdc_CommitMeasurement(const FocusAdcMeasurement *measurement)
   __set_PRIMASK(primask);
 }
 
+/* 12 位原始计数按 VDDA 换算为引脚 mV，加半分母进行整数四舍五入。 */
 static uint32_t FocusAdc_RawToMilliVolts(uint16_t raw, uint16_t vdda_mv)
 {
   return (((uint32_t)raw * (uint32_t)vdda_mv) + (FOCUS_ADC_RESOLUTION_COUNTS / 2UL)) /
          FOCUS_ADC_RESOLUTION_COUNTS;
 }
 
+/* 只接收本模块注册的 ADC，避免共享 HAL 回调误处理其他实例。 */
 static uint8_t FocusAdc_IsOurHandle(ADC_HandleTypeDef *hadc)
 {
   return (uint8_t)((hadc != NULL) && (hadc == s_hadc));
 }
 
+/* 失败也发布带序号/统计的结果，但 valid=0，测量值清零。 */
 static void FocusAdc_PublishFailure(uint8_t error, uint8_t raw_count,
                                     uint32_t timestamp_ms, uint32_t sequence,
                                     uint32_t hal_error_code)
@@ -76,6 +81,7 @@ static void FocusAdc_PublishFailure(uint8_t error, uint8_t raw_count,
   FocusAdc_CommitMeasurement(&next);
 }
 
+/* 主循环终止失败帧，必要时停止 ADC 中断采集并更新错误统计。 */
 static void FocusAdc_FinishFailure(uint8_t error, uint32_t now_ms, uint8_t stop_adc,
                                    uint32_t hal_error_code)
 {
@@ -113,6 +119,7 @@ static void FocusAdc_FinishFailure(uint8_t error, uint32_t now_ms, uint8_t stop_
   (void)now_ms;
 }
 
+/* 主循环换算完整帧：先验证 VREF，再计算引脚电压和 MCU 温度估计。 */
 static void FocusAdc_PublishComplete(const FocusAdcRawFrame *frame)
 {
   FocusAdcMeasurement next;
@@ -124,6 +131,7 @@ static void FocusAdc_PublishComplete(const FocusAdcRawFrame *frame)
   uint16_t temp_cal_raw;
 
   (void)memset(&next, 0, sizeof(next));
+  /* 正向扫描按通道号排序：0、1、4、5、9、16、17，必须与 IOC 保持一致。 */
   next.raw_ntc1 = frame->raw[0];
   next.raw_3v3 = frame->raw[1];
   next.raw_ntc2 = frame->raw[2];
@@ -150,7 +158,7 @@ static void FocusAdc_PublishComplete(const FocusAdcRawFrame *frame)
     return;
   }
 
-  /* VREFINT_CAL is the factory reading at 3.3 V. */
+  /* 工厂在 3.3 V 下记录 VREFINT_CAL：VDDA = 校准字 × 3300 / 当前 VREFINT。 */
   vdda_mv = ((uint32_t)vref_cal * VREFINT_CAL_VREF + (frame->raw[6] / 2U)) /
             frame->raw[6];
   if ((vdda_mv < 1800U) || (vdda_mv > 5000U))
@@ -174,9 +182,8 @@ static void FocusAdc_PublishComplete(const FocusAdcRawFrame *frame)
   next.motor_ipropi_pin_mv = (uint16_t)FocusAdc_RawToMilliVolts(frame->raw[4], (uint16_t)vdda_mv);
   next.temperature_sensor_mv = (uint16_t)FocusAdc_RawToMilliVolts(frame->raw[5], (uint16_t)vdda_mv);
 
-  /* STM32F030x4/x6 has only the factory TS_CAL1 value at 30 C. Normalize
-   * this reading to the 3.3 V calibration condition and use DS9773's typical
-   * 4.3 mV/C slope. This is an estimate, not a two-point calibrated reading. */
+  /* 本型号只有 30 ℃工厂单点校准。统一到校准电压条件，使用典型 4.3 mV/℃
+   * 斜率估算；没有两点温度校准。温度校准字无效不影响其他引脚电压。 */
   temp_mv = FocusAdc_RawToMilliVolts(frame->raw[5], (uint16_t)vdda_mv);
   temp_cal_raw = *TEMPSENSOR_CAL1_ADDR;
   temp_cal_mv = FocusAdc_RawToMilliVolts(temp_cal_raw,
@@ -209,6 +216,7 @@ static void FocusAdc_PublishComplete(const FocusAdcRawFrame *frame)
   FocusAdc_CommitMeasurement(&next);
 }
 
+/* 清理状态并执行硬件自校准；外设扫描配置已由 MX_ADC_Init 完成。 */
 HAL_StatusTypeDef FocusAdc_Init(ADC_HandleTypeDef *hadc)
 {
   if ((hadc == NULL) || (hadc->Instance == NULL))
@@ -246,6 +254,7 @@ HAL_StatusTypeDef FocusAdc_Init(ADC_HandleTypeDef *hadc)
   return HAL_OK;
 }
 
+/* 准备帧状态后软件触发；当前帧未结束时返回 HAL_BUSY，不覆盖原始数据。 */
 HAL_StatusTypeDef FocusAdc_Request(uint32_t now_ms)
 {
   HAL_StatusTypeDef status;
@@ -285,6 +294,7 @@ HAL_StatusTypeDef FocusAdc_Request(uint32_t now_ms)
   return status;
 }
 
+/* 主循环领取 ISR 事件；优先处理错误，再处理完成或跨回绕的超时。 */
 void FocusAdc_Process(uint32_t now_ms)
 {
   uint32_t primask;
@@ -331,6 +341,7 @@ void FocusAdc_Process(uint32_t now_ms)
   }
 }
 
+/* ADC ISR 逐通道读取 DR；仅第七个结果且 EOS 有效时发布完成标记。 */
 void FocusAdc_OnConversionComplete(ADC_HandleTypeDef *hadc)
 {
   uint8_t index;
@@ -342,8 +353,7 @@ void FocusAdc_OnConversionComplete(ADC_HandleTypeDef *hadc)
     return;
   }
 
-  /* HAL invokes this callback for EOC before it clears EOC/EOS. Read DR now;
-   * this short ISR copy prevents the next channel from overwriting the result. */
+  /* HAL 清 EOC/EOS 前进入回调，必须立即读取 DR，防止下一通道覆盖结果。 */
   index = s_frame_count;
   if (index >= FOCUS_ADC_CHANNEL_COUNT)
   {
@@ -359,6 +369,7 @@ void FocusAdc_OnConversionComplete(ADC_HandleTypeDef *hadc)
   {
     if (s_frame_count == FOCUS_ADC_CHANNEL_COUNT)
     {
+      /* 原始值全部写入后再置完成标记，主循环用同样的屏障读取。 */
       __DMB();
       s_frame_complete = 1U;
     }
@@ -369,12 +380,12 @@ void FocusAdc_OnConversionComplete(ADC_HandleTypeDef *hadc)
   }
   else if (s_frame_count == FOCUS_ADC_CHANNEL_COUNT)
   {
-    /* Seven EOCs without EOS means the configured sequence does not match the
-     * expected seven-rank scan. Do not let another callback mix in a new frame. */
+    /* 收满七个结果仍无 EOS，说明扫描序列不匹配；拒绝继续拼接，避免混帧。 */
     s_async_error = 2U;
   }
 }
 
+/* ISR 只记录 HAL 错误码；停止采集和发布失败帧由主循环完成。 */
 void FocusAdc_OnError(ADC_HandleTypeDef *hadc)
 {
   if ((FocusAdc_IsOurHandle(hadc) != 0U) && (s_busy != 0U))
@@ -384,6 +395,7 @@ void FocusAdc_OnError(ADC_HandleTypeDef *hadc)
   }
 }
 
+/* 复制最近发布结果；available 与 valid 不同，失败结果也可读取。 */
 uint8_t FocusAdc_GetSnapshot(FocusAdcMeasurement *snapshot)
 {
   uint32_t primask;

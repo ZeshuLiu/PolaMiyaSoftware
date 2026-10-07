@@ -20,6 +20,8 @@
  ******************************************************************************
  */
 
+/* newlib 最小系统调用模板。__io_putchar/getchar 仅为弱声明，
+ * 当前工程没有提供串口标准输入输出后端；这些接口不等于串口业务已实现。 */
 /* Includes */
 #include <sys/stat.h>
 #include <stdlib.h>
@@ -41,15 +43,18 @@ char **environ = __env;
 
 
 /* Functions */
+/* 保留空监控初始化入口，当前没有主机文件系统或半主机业务。 */
 void initialise_monitor_handles()
 {
 }
 
+/* 裸机无进程管理，返回固定进程号。 */
 int _getpid(void)
 {
   return 1;
 }
 
+/* 不支持进程信号，设置错误并返回失败。 */
 int _kill(int pid, int sig)
 {
   (void)pid;
@@ -58,12 +63,14 @@ int _kill(int pid, int sig)
   return -1;
 }
 
+/* C 库退出入口最终停留；应用故障停机应调用 FocusUnit_FaultStop。 */
 void _exit (int status)
 {
   _kill(status, -1);
   while (1) {}    /* Make sure we hang here */
 }
 
+/* 标准输入模板：依赖外部 __io_getchar 实现，当前无可用串口后端。 */
 __attribute__((weak)) int _read(int file, char *ptr, int len)
 {
   (void)file;
@@ -77,6 +84,7 @@ __attribute__((weak)) int _read(int file, char *ptr, int len)
   return len;
 }
 
+/* 标准输出模板：依赖外部 __io_putchar 实现，当前不用于业务日志。 */
 __attribute__((weak)) int _write(int file, char *ptr, int len)
 {
   (void)file;
@@ -89,6 +97,7 @@ __attribute__((weak)) int _write(int file, char *ptr, int len)
   return len;
 }
 
+/* 当前无文件系统，关闭操作返回失败。 */
 int _close(int file)
 {
   (void)file;
@@ -96,6 +105,7 @@ int _close(int file)
 }
 
 
+/* 模板将文件描述符视作字符设备，不提供实际文件元数据。 */
 int _fstat(int file, struct stat *st)
 {
   (void)file;
@@ -103,12 +113,14 @@ int _fstat(int file, struct stat *st)
   return 0;
 }
 
+/* 模板将描述符视作终端，不代表已经连接串口。 */
 int _isatty(int file)
 {
   (void)file;
   return 1;
 }
 
+/* 保留定位桩，直接返回 0，无实际文件位置。 */
 int _lseek(int file, int ptr, int dir)
 {
   (void)file;
@@ -117,6 +129,7 @@ int _lseek(int file, int ptr, int dir)
   return 0;
 }
 
+/* 不支持打开文件，始终返回失败。 */
 int _open(char *path, int flags, ...)
 {
   (void)path;
@@ -125,6 +138,7 @@ int _open(char *path, int flags, ...)
   return -1;
 }
 
+/* 裸机无子进程，返回 ECHILD。 */
 int _wait(int *status)
 {
   (void)status;
@@ -132,6 +146,7 @@ int _wait(int *status)
   return -1;
 }
 
+/* 不支持删除文件，返回 ENOENT。 */
 int _unlink(char *name)
 {
   (void)name;
@@ -139,12 +154,14 @@ int _unlink(char *name)
   return -1;
 }
 
+/* 未提供进程 CPU 时间统计。 */
 int _times(struct tms *buf)
 {
   (void)buf;
   return -1;
 }
 
+/* 文件路径查询模板只填字符设备类型，无真实文件系统。 */
 int _stat(char *file, struct stat *st)
 {
   (void)file;
@@ -152,6 +169,7 @@ int _stat(char *file, struct stat *st)
   return 0;
 }
 
+/* 不支持硬链接，返回 EMLINK。 */
 int _link(char *old, char *new)
 {
   (void)old;
@@ -160,12 +178,14 @@ int _link(char *old, char *new)
   return -1;
 }
 
+/* 不支持创建进程，返回 EAGAIN。 */
 int _fork(void)
 {
   errno = EAGAIN;
   return -1;
 }
 
+/* 不支持执行外部程序，保留模板失败返回。 */
 int _execve(char *name, char **argv, char **env)
 {
   (void)name;

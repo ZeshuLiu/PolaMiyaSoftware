@@ -10,7 +10,7 @@
 
 | 目录 | 对应硬件 / MCU | 状态 |
 | --- | --- | --- |
-| [code/PM_Controller](code/PM_Controller/) | 第二代主控器 PM_Controller Rev2.0 / ESP32-S3-WROOM-1-N16R8 | ST7789 屏幕测试工程，已配置双 OTA 分区 |
+| [code/PM_Controller](code/PM_Controller/) | 第二代主控器 PM_Controller Rev2.0 / ESP32-S3-WROOM-1-N16R8 | 官方 LVGL 移植组件与 ST7789 屏幕测试，已配置双 OTA 分区 |
 | [code/FocusUnit](code/FocusUnit/) | 独立对焦组件 / STM32F030F4Px | 独立维护，兼容性按组件硬件版本确认 |
 | [code/Scripts](code/Scripts/) | 辅助计算脚本 | 按脚本用途使用 |
 | [archive/PM_Controller_Rev1_x](archive/PM_Controller_Rev1_x/) | 第一代主控系统 / STM32G474 + STM32L011 | 历史固件归档，不适用于第二代主控器 |
@@ -18,9 +18,11 @@
 
 ## 开发入口
 
-第二代主控器在 [code/PM_Controller](code/PM_Controller/README.md) 开发，使用 ESP-IDF 6.1。当前程序用于确认 ST7789 屏幕方向和偏移，驱动封装与测试代码分目录存放。引脚和双 OTA 分区已配置；电机、BLE、手动开启 Wi-Fi 和 OTA 业务后续实现。
+第二代主控器在 [code/PM_Controller](code/PM_Controller/README.md) 开发，使用 ESP-IDF 6.1、官方 esp_lcd ST7789 驱动和 esp_lvgl_port。当前方向与偏移测试使用 LVGL 控件绘制；74HC165 已实现 6 个按键的消抖、长短按及事件标志位读取；24C64 已实现分页访问和带版本、CRC 的参数轮换保存；闪光输出已实现默认 20 ms 单次高电平脉冲。板级初始化、驱动和测试代码分目录存放。引脚和双 OTA 分区已配置；电机、BLE、手动开启 Wi-Fi 和 OTA 业务后续实现。
 
 对焦组件的配置、模块接口、构建与验证记录见 [FocusUnit 工程说明](code/FocusUnit/AGENT.md)。它是独立组件，不随旧主控固件一起归档。
+
+2026-10-07：移除主控器和对焦组件的本地主机测试、桩、测试入口及缓存，保留固件内的屏幕测试和电机演示。各工程文档保留清理前的验证结果。
 
 ## 第一代固件
 

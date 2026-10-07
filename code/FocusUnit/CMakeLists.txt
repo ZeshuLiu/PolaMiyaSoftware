@@ -42,6 +42,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
 )
 
+# 将四个按功能分目录的业务模块加入最终固件，CubeMX 生成清单不自动包含它们。
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/FocusUnit/Adc/focus_adc.c
@@ -50,6 +51,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/FocusUnit/Scheduler/focus_scheduler.c
 )
 
+# Debug 强制 -Os，避免生成工具链默认 -O0 造成 16 KB Flash 超限；保留 -g3。
 # Apply to the application and STM32_Drivers through their shared interface.
 # Keep this override in the user-owned file: CubeMX regenerates the toolchain
 # with -O0 for Debug, which overflows this device's 16 KB Flash.
@@ -58,11 +60,13 @@ target_compile_options(stm32cubemx INTERFACE
     $<$<CONFIG:Debug>:-Os>
 )
 
+# 应用和 HAL 同时启用 LTO，跨文件裁剪未使用分支；会影响单步和局部变量观察。
 # Compile the HAL and application together at link time so unused generic HAL
 # branches can be removed without replacing drivers or changing peripherals.
 set_property(TARGET ${CMAKE_PROJECT_NAME} STM32_Drivers
     PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE
 )
+# 链接阶段也使用 -Os，使 LTO 按体积优化。
 # LTO also runs optimization during linking. Override Debug's generated -O0
 # there as well, rather than applying -Os only to individual source files.
 target_link_options(${CMAKE_PROJECT_NAME} PRIVATE -Os)

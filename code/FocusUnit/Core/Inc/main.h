@@ -16,6 +16,7 @@
   *
   ******************************************************************************
   */
+/* 板级引脚标签与故障接口；PA9/PA10 为电机 IN2/IN1，PA13/PA14 保留 SWD。 */
 /* USER CODE END Header */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
@@ -53,6 +54,7 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+/* 初始化错误/HardFault 时直接令桥输入 00 滑行/睡眠，不等待定时器更新。 */
 void FocusUnit_FaultStop(void);
 /* USER CODE END EFP */
 

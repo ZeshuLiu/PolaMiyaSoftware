@@ -1,5 +1,36 @@
 # Focus Unit 软件工程记录
 
+## 当前实现概览（2026-10-07，代码核对）
+
+当前是已集成的基础采集与电机开环演示固件，目标为 STM32F030F4Px，48 MHz、16 KB Flash、4 KB RAM。
+
+| 功能 | 当前实现 | 尚未实现或待确认 |
+| --- | --- | --- |
+| 调度 | TIM14 1 ms 中断；主循环执行编码器 1 ms、电机 10 ms、ADC 100 ms 任务，记录积压与延迟，空闲 WFI | 时基精度与实机最长任务延迟待测 |
+| ADC | 七通道中断扫描、自校准、VDDA 补偿、引脚 mV、MCU 温度估算；帧序、超时、HAL 错误检测与失败帧发布 | NTC 实际温度、分压前轨电压、电机实际电流换算未实现，参数待核实；尚未使用 ADC DMA |
+| 电机 | 20 kHz PWM；A 后 B，各自加速/保持/减速/制动各 3 s，24 s 循环；同步 CCR、唤醒、换向制动保护、Stop | 速度/位置闭环、目标位置控制、归零/行程管理、应用层过流/过温阈值保护未实现 |
+| 编码器 | 硬件四倍频；有符号位置累计、回绕、置零、符号映射、半圈歧义和位置饱和锁存 | 计数到实际位移/速度的换算未实现；线序和滤波适配待实机确认 |
+| 串口 | USART1 460800 8N1 与 TX/RX DMA、IRQ 已预配置 | 未启动收发，无控制协议、状态上报或串口升级实现 |
+| 调试与故障 | SWD、模块快照和软件置零请求；初始化错误/HardFault 直接令桥输入双低 | NMI 当前只停留，没有调用桥停机；硬件异常与调试恢复覆盖尚未完成定量验收 |
+
+2026-09-28 的“初步测试OK”为用户反馈，具体固件版本、时长、逐项结果未记录；不扩展为优化构建和异常边界均已实机验收。本次未烧写或操作电机。
+
+### 中文注释与本次验证
+
+- 业务模块的全部函数、测量字段和接口补充中文说明，标明单位、主循环/ISR 调用范围、数据有效性和回绕边界；主入口、外设初始化、中断、C 库支持、构建及测试入口同步补注释。
+- CubeMX 带 `USER CODE` 标记的文件中，新增说明放在对应保留区域；原标记、许可及 Drivers 原文保留。系统/C 库模板中的说明在以后重新生成模板时需核对保留情况。
+- 固件 C/H 仅改注释。四个 MSVC 测试入口添加 `/utf-8`，PowerShell 测试脚本采用 UTF-8 BOM，解决 CP936 默认代码页及 Windows PowerShell 对中文脚本的识别问题；测试断言和固件逻辑不变。
+- 四个原有宿主模块测试全部通过。CMake GNU 14.3.1 Debug/Release 编译链接通过，Flash 均为 11296 / 16384 B，剩余 5088 B；RAM 链接占用均为 2568 / 4096 B，包含预留堆栈。
+- 31 个修改后的 C/H 文件去掉注释后的代码 token 与 Git HEAD 一致；从最终 ELF 导出的 Debug/Release BIN 均与修改前 SHA-256 一致，均为 `155b42dc0bd506086f7eb2969a3b1816878125fddd2e62a3bfec05e9fccc9e72`。核对记录在 `.build/comment-verification.json`，仅调试信息中的源码行号随注释移动。
+- 当前 `FocusMotor_SetPositiveDirection()` 允许运行中修改逻辑方向，没有 `HAL_BUSY` 限制；`period_counts` 字段暂未用于可变周期，实际固定为 2400。记录按当前代码修正，未修改运行行为。
+- `tools/regenerate_focusunit.py` 仍按集中式 `main.c` / MSP 结构验证外设配置，未适配现在拆分的 `adc.c`、`tim.c`、`usart.c`。本次只补用途及适用范围注释，没有运行该脚本；当前再生成应通过 IOC/CubeMX，随后核对各拆分文件、USER CODE、顶层 CMake 和构建结果。
+
+### 本地测试清理（2026-10-07）
+
+按用户要求移除宿主模块测试、HAL 桩、统一测试入口和本地测试缓存，清理文档中的运行命令。下文宿主测试结果为清理前的历史记录。保留固件内的电机演示、故障处理、SWD 观察接口及构建/生成工具。
+
+提交前核对：27 个保留的固件 C/H 修改去掉注释后与 Git HEAD 的代码 token 一致；保留的两个 Python 工具语法树一致。主控构建清单引用及相关文档本地链接有效，无已删除测试入口引用。本次未重新构建或执行宿主/实机测试。
+
 ## 范围与协作约定
 
 - 本文仅适用于 `E:\Develop\PolaMiyaSoftware\code\FocusUnit`。
@@ -71,7 +102,7 @@
 - ADC 对外结构体为 `FocusAdcMeasurement`。工厂参考计算为 `VDDA_mV = 3300 * VREFINT_CAL / ADC_VREFINT`，引脚电压为 `raw * VDDA / 4095`，采用整数及舍入。外部 NTC、电源轨、电机 IPROPI 当前只发布校准后的引脚 mV，不提供未经核实的 NTC 温度、轨电压或电机电流单位换算。
 - MCU 温度使用本型号的 TS_CAL1（30 C）和典型斜率 4.3 mV/C，属于估算，不使用该型号未声明的 TS_CAL2。`temperature_valid` 单独表示校准字有效，不能解读为温度精度保证；无效温度校准不会破坏其他引脚电压结果。
 - ADC 完整结构体在短临界区内发布，GetSnapshot 提供一致性读取；原始帧在完成标志前后使用内存屏障。采集后端和主循环换算分离，未来可用 DMA1_CH1 整帧采集替代 EOC 收集而保留对外结果接口（届时须按本 MCU DMA 映射重新配置 IOC 并验证）。
-- 电机 `FocusMotor_ConfigData.max_duty_permille` 默认 1000，范围 0..1000；`positive_direction` 默认 A，仅影响快照 `logical_sign`，Demo 的物理顺序始终 A 后 B。`FocusMotor_SetPositiveDirection()` 在未运行时设置；运行中返回 HAL_BUSY。需要改变默认时可在初始化前设置配置，或停机后设置映射。
+- 电机 `FocusMotor_ConfigData.max_duty_permille` 默认 1000，范围 0..1000；`positive_direction` 默认 A，仅影响快照 `logical_sign`，Demo 的物理顺序始终 A 后 B。按 2026-10-07 当前代码，`FocusMotor_SetPositiveDirection()` 接受 A/B 并允许运行中修改，非法值返回 HAL_ERROR；快照符号在下一次状态发布时更新。
 - 电机两个 CCR 开启预装载，成对更新期间用 CR1.UDIS 抑制硬件更新事件，恢复后于同一 PWM 更新事件生效。对外 0% 对应 IN1=IN2=1 制动；100% 对应 10 或 01 持续驱动，使用 ARR+1=2400 实现常高。启动先低输入，再制动唤醒至少 1ms；10ms 调度使上电启动阶段通常占约 20ms。正常 Demo 每阶段 3000ms、整圈 24000ms；输出更新分辨率 10ms，时基精度取决于实际系统时钟。
 - 电机相位按绝对时间计算，每圈更新基准，避免长期运行后的 uint32_t 时钟回绕造成周期跳变。如果 main 延迟跳过了原定制动阶段，实际换向前额外插入至少 1ms 制动保护；这是电气状态切换间隔，不能保证机械转子已经停止。电机 Init/Update/Stop/SetPositiveDirection 只在 main 上下文调用；GetSnapshot 可在 ISR 调用。
 - 编码器 `FocusEncoderMeasurement.position` 为 int32_t。相邻计数器差值按 16 位模差解释，负增量从 65535 转换而非直接把 CNT 当位置。恰好半圈差值 32768 或位置溢出会锁存无效状态，直到 Zero 重建基准；更大实际位移或多圈不能仅由 CNT 自动检出。`elapsed_ms` 与调度积压统计用于观察主循环延迟。
@@ -83,7 +114,7 @@
 
 ### IOC 重新生成与构建
 
-本机 `project generate` 路径会误进入固件下载/登录流程；已有 F0 V1.11.6 固件无需下载。`tools/regenerate_focusunit.py` 调用已安装 CubeMX 的 `generate code` 模式，在独立临时目录中生成，再安装六个指定 Core 文件。
+以下是 2026-09-28 集中式工程的生成流程历史记录，不能直接用于当前拆分的 CMake 工程：`tools/regenerate_focusunit.py` 尚未适配拆分结构，见本文当前实现概览。此前本机 `project generate` 路径会误进入固件下载/登录流程；已有 F0 V1.11.6 固件无需下载。旧脚本调用已安装 CubeMX 的 `generate code` 模式，在独立临时目录中生成，再安装六个指定 Core 文件。
 
 生成前将当前 Core 中 main、MSP、中断及对应头文件复制到临时 Src/Inc，让 CubeMX 保留 USER CODE；安装前逐一验证非空用户代码区、ADC/TIM 参数、TIM14 IRQ 和上拉。模块目录、Drivers、Startup、IDE 元数据不会由该脚本替换。所有检查通过后才更新 Core，保留临时目录和生成日志。不能仅凭 CubeMX 进程退出码认定生成成功。
 
@@ -93,8 +124,8 @@ IOC 固定 FW_F0 V1.11.6、关闭自动选择最新固件和删除旧文件；�
 
 ```powershell
 Set-Location 'E:\Develop\PolaMiyaSoftware\code\FocusUnit'
-python tools/regenerate_focusunit.py
-python tools/test_focusunit.py
+# 仅旧集中式工程适用；当前拆分工程暂不运行此脚本
+# python tools/regenerate_focusunit.py
 python tools/build_focusunit.py --configuration Debug
 python tools/build_focusunit.py --configuration Release
 ```
@@ -103,7 +134,7 @@ python tools/build_focusunit.py --configuration Release
 
 ### 已完成验证（2026-09-28）
 
-- 四个实际 C 模块的 MSVC C11 `/W4 /WX` 宿主测试通过；统一入口为 `python tools/test_focusunit.py`。
+- 四个实际 C 模块的 MSVC C11 `/W4 /WX` 宿主测试通过；测试代码及入口已于 2026-10-07 移除。
 - ADC：完整七通道扫描、VDDA/mV/温度估算、提前 EOS、跨 tick 回绕超时、overrun、启动失败、零 VREF、无效温度校准字以及错误后下一帧恢复。
 - 电机：两路启动、0/50/100% 输出、A/B 阶段、第二圈阶段时间、正映射 B 但物理 A 先运行、周期重基准/时钟回绕、UDIS 成对更新、跨过制动段后的换向保护、错误路径与配置边界。
 - 编码器：正负位移、双向硬件回绕、符号映射、置零、tick 回绕及延迟、半圈歧义、int32 两端饱和与置零恢复。

@@ -20,6 +20,7 @@
  ******************************************************************************
  */
 
+/* newlib 堆分配支持：按链接器边界预留主栈空间，不是实际栈深测量。 */
 /* Includes */
 #include <errno.h>
 #include <stdint.h>
@@ -50,6 +51,7 @@ static uint8_t *__sbrk_heap_end = NULL;
  * @param incr Memory size
  * @return Pointer to allocated memory
  */
+/* 从 _end 向高地址扩展堆；超过预留栈边界时返回 -1 并设置 ENOMEM。 */
 void *_sbrk(ptrdiff_t incr)
 {
   extern uint8_t _end; /* Symbol defined in the linker script */

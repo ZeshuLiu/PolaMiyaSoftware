@@ -15,6 +15,7 @@
   *
   ******************************************************************************
   */
+/* 主入口：外设初始化 -> 四个业务模块启动 -> 主循环领取任务并发布 SWD 快照。 */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -50,14 +51,14 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-/* Coherent module snapshots exposed for SWD watch; no serial business yet. */
+/* SWD 观察变量：主循环从模块一致快照复制；当前没有串口业务。
+ * 这些应用层副本便于调试，ISR 如需一致数据应调用模块 GetSnapshot。 */
 volatile FocusAdcMeasurement g_focus_adc_measurement;
 volatile FocusEncoderMeasurement g_focus_encoder_measurement;
 volatile FocusMotor_Snapshot g_focus_motor_state;
 volatile FocusSchedulerStatus g_focus_scheduler_status;
-volatile uint32_t g_focus_fault;
-/* Set to 1 through SWD or a future control layer; consumed at the next
-   encoder task. The module also exposes FocusEncoder_Zero() to C callers. */
+volatile uint32_t g_focus_fault; /* 1=ADC，2=编码器，3=电机，4=调度，5=其他初始化错误 */
+/* SWD 置 1 后由下一次编码器任务原子消费并清零；C 接口也可调用 Zero。 */
 volatile uint8_t g_focus_encoder_zero_request;
 /* USER CODE END PV */
 
@@ -71,8 +72,8 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN 0 */
 void FocusUnit_FaultStop(void)
 {
-  /* Also works before PWM initialization. Disable both bridge inputs without
-     waiting for the next PWM update, HAL lock, scheduler, or interrupts. */
+  /* 故障停机直接将 PA9/PA10 改为低电平 GPIO，桥进入 00 滑行/睡眠。
+     PWM 尚未初始化时也可调用，不等待 PWM 更新、HAL 锁或任务调度。 */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   GPIOA->BSRR = (uint32_t)(GPIO_PIN_9 | GPIO_PIN_10) << 16U;
   MODIFY_REG(GPIOA->MODER, GPIO_MODER_MODER9 | GPIO_MODER_MODER10,
@@ -105,6 +106,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  /* HSI 8 MHz / 2 × 12 = 48 MHz，AHB/APB 不分频；无外部晶振时钟依赖。 */
 
   /* USER CODE END SysInit */
 
@@ -119,9 +121,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   __HAL_DBGMCU_FREEZE_TIM14();
   __HAL_DBGMCU_FREEZE_TIM3();
-  /* Keep PWM running while halted: freezing TIM1 may hold a drive level.
-     A breakpoint is not a motor stop; call FocusMotor_Stop before halting. */
+  /* 调试暂停时冻结调度/编码器，但保持 PWM，避免冻结在持续驱动电平。
+     断点不是停机命令，暂停前需在主循环调用 FocusMotor_Stop。 */
   __HAL_DBGMCU_UNFREEZE_TIM1();
+  /* 先校准 ADC、启动编码器和电机，最后启动调度时基；任一失败进入故障停机。 */
   if (FocusAdc_Init(&hadc) != HAL_OK)
   {
     g_focus_fault = 1U;
@@ -151,12 +154,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    /* 原子领取本轮任务；同类积压只执行一次，业务使用当前绝对时刻。 */
     const FocusSchedulerDispatch dispatch = FocusScheduler_Take();
     FocusAdcMeasurement adc_snapshot;
     if ((dispatch.flags & FOCUS_TASK_ENCODER) != 0U)
     {
       FocusEncoderMeasurement encoder_snapshot;
       FocusEncoder_Update(dispatch.now_ms);
+      /* 领取软件置零请求，避免读取与清除之间被异步请求覆盖。 */
       const uint32_t irq_state = __get_PRIMASK();
       __disable_irq();
       const uint8_t zero_requested = g_focus_encoder_zero_request;
@@ -169,6 +174,7 @@ int main(void)
       FocusEncoder_GetSnapshot(&encoder_snapshot);
       g_focus_encoder_measurement = encoder_snapshot;
     }
+    /* 每轮处理采集完成/错误/超时，不必等到下一次 100 ms 请求。 */
     FocusAdc_Process(dispatch.now_ms);
     if ((dispatch.flags & FOCUS_TASK_MOTOR) != 0U)
     {
@@ -184,11 +190,12 @@ int main(void)
     if ((dispatch.flags & FOCUS_TASK_ADC) != 0U)
     {
       FocusSchedulerStatus scheduler_snapshot;
-      /* Busy/failure is recorded by ADC; do not block other tasks to retry. */
+      /* 忙时跳过本次请求，启动失败由 ADC 发布；不阻塞其他任务重试。 */
       (void)FocusAdc_Request(dispatch.now_ms);
       FocusScheduler_GetSnapshot(&scheduler_snapshot);
       g_focus_scheduler_status = scheduler_snapshot;
     }
+    /* 没有待领取任务时 WFI，ADC 完成中断或下一次 TIM14 tick 可唤醒。 */
     FocusScheduler_Idle();
   }
   /* USER CODE END 3 */
@@ -240,16 +247,19 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+/* HAL 定时器回调转发至调度模块，模块内部只接受已注册 TIM14。 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   FocusScheduler_OnTick(htim);
 }
 
+/* 单通道 EOC 回调在 ISR 内及时读 DR，避免结果被下一通道覆盖。 */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *adc)
 {
   FocusAdc_OnConversionComplete(adc);
 }
 
+/* ADC ISR 只上报错误；终止采集和发布失败结果交由主循环。 */
 void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *adc)
 {
   FocusAdc_OnError(adc);
@@ -263,6 +273,7 @@ void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *adc)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
+  /* 先使桥输入双低，再关中断停留，保留故障编号供 SWD 排查。 */
   FocusUnit_FaultStop();
   if (g_focus_fault == 0U)
   {

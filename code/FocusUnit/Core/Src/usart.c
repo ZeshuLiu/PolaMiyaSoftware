@@ -16,6 +16,7 @@
   *
   ******************************************************************************
   */
+/* USART1 仅完成硬件预配置，尚未启动控制协议、收发或串口升级业务。 */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
@@ -34,6 +35,7 @@ void MX_USART1_UART_Init(void)
 {
 
   /* USER CODE BEGIN USART1_Init 0 */
+  /* USART1：460800 baud，8 数据位，无校验，1 停止位，无硬件流控。 */
 
   /* USER CODE END USART1_Init 0 */
 
@@ -67,6 +69,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
   if(uartHandle->Instance==USART1)
   {
   /* USER CODE BEGIN USART1_MspInit 0 */
+  /* PA2=TX、PA3=RX；DMA1_CH3 接收、CH2 发送，Normal 模式，只预配置。 */
 
   /* USER CODE END USART1_MspInit 0 */
     /* USART1 clock enable */
@@ -132,6 +135,7 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
   if(uartHandle->Instance==USART1)
   {
   /* USER CODE BEGIN USART1_MspDeInit 0 */
+  /* 释放 TX/RX 引脚、收发 DMA 和 USART1 中断。 */
 
   /* USER CODE END USART1_MspDeInit 0 */
     /* Peripheral clock disable */

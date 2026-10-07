@@ -16,6 +16,7 @@
   *
   ******************************************************************************
   */
+/* ADC 外设配置；本文件只初始化硬件，采集/换算由 FocusUnit/Adc 完成。 */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "adc.h"
@@ -31,12 +32,14 @@ void MX_ADC_Init(void)
 {
 
   /* USER CODE BEGIN ADC_Init 0 */
+  /* 12 位正向七通道扫描：IN0/1/4/5/9/16/17，顺序必须与业务 raw[] 一致。 */
 
   /* USER CODE END ADC_Init 0 */
 
   ADC_ChannelConfTypeDef sConfig = {0};
 
   /* USER CODE BEGIN ADC_Init 1 */
+  /* PCLK/4=12 MHz，采样 239.5 周期，软件触发一次完整序列，单通道 EOC 中断；当前不用 DMA。 */
 
   /* USER CODE END ADC_Init 1 */
 
@@ -131,6 +134,7 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
   if(adcHandle->Instance==ADC1)
   {
   /* USER CODE BEGIN ADC1_MspInit 0 */
+  /* 启用 ADC/GPIO 时钟，五个外部采样脚配置模拟输入，ADC IRQ 优先级 0。 */
 
   /* USER CODE END ADC1_MspInit 0 */
     /* ADC1 clock enable */
@@ -170,6 +174,7 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
   if(adcHandle->Instance==ADC1)
   {
   /* USER CODE BEGIN ADC1_MspDeInit 0 */
+  /* 释放 ADC 外部采样引脚并关闭 ADC 中断。 */
 
   /* USER CODE END ADC1_MspDeInit 0 */
     /* Peripheral clock disable */

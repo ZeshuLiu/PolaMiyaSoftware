@@ -16,6 +16,7 @@
   *
   ******************************************************************************
   */
+/* 定时器配置：TIM1 电机 PWM、TIM3 编码器、TIM14 调度时基。 */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "tim.h"
@@ -33,6 +34,7 @@ void MX_TIM1_Init(void)
 {
 
   /* USER CODE BEGIN TIM1_Init 0 */
+  /* 48 MHz / (0+1) / (2399+1) = 20 kHz；CH3=PA10/IN1，CH2=PA9/IN2。 */
 
   /* USER CODE END TIM1_Init 0 */
 
@@ -41,6 +43,7 @@ void MX_TIM1_Init(void)
   TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
 
   /* USER CODE BEGIN TIM1_Init 1 */
+  /* PWM1 高有效；初始 CCR=2400 对应常高，模块启动前会写入双低，再制动唤醒。 */
 
   /* USER CODE END TIM1_Init 1 */
   htim1.Instance = TIM1;
@@ -97,6 +100,7 @@ void MX_TIM3_Init(void)
 {
 
   /* USER CODE BEGIN TIM3_Init 0 */
+  /* TI12 硬件 AB 四倍频，ARR=65535；软件每 1 ms 累计模差，不使用边沿 IRQ。 */
 
   /* USER CODE END TIM3_Init 0 */
 
@@ -104,6 +108,7 @@ void MX_TIM3_Init(void)
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
   /* USER CODE BEGIN TIM3_Init 1 */
+  /* 两路输入滤波均为 4；滤波是否适合实际编码器需结合脉冲宽度验证。 */
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
@@ -141,6 +146,7 @@ void MX_TIM14_Init(void)
 {
 
   /* USER CODE BEGIN TIM14_Init 0 */
+  /* 48 MHz / (47+1) / (999+1) = 1 kHz 更新事件，即 1 ms 调度 tick。 */
 
   /* USER CODE END TIM14_Init 0 */
 
@@ -169,6 +175,7 @@ void HAL_TIM_PWM_MspInit(TIM_HandleTypeDef* tim_pwmHandle)
   if(tim_pwmHandle->Instance==TIM1)
   {
   /* USER CODE BEGIN TIM1_MspInit 0 */
+  /* 只使能 TIM1 时钟，PWM 由硬件输出，不开启 TIM1 更新 IRQ。 */
 
   /* USER CODE END TIM1_MspInit 0 */
     /* TIM1 clock enable */
@@ -186,6 +193,7 @@ void HAL_TIM_Encoder_MspInit(TIM_HandleTypeDef* tim_encoderHandle)
   if(tim_encoderHandle->Instance==TIM3)
   {
   /* USER CODE BEGIN TIM3_MspInit 0 */
+  /* PA6/PA7 复用 TIM3 CH1/CH2 并内部上拉，不开启逐边沿或溢出 IRQ。 */
 
   /* USER CODE END TIM3_MspInit 0 */
     /* TIM3 clock enable */
@@ -215,6 +223,7 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
   if(tim_baseHandle->Instance==TIM14)
   {
   /* USER CODE BEGIN TIM14_MspInit 0 */
+  /* 使能 TIM14 时钟与更新中断，IRQ 优先级 1，低于 ADC。 */
 
   /* USER CODE END TIM14_MspInit 0 */
     /* TIM14 clock enable */
@@ -235,6 +244,7 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
   if(timHandle->Instance==TIM1)
   {
   /* USER CODE BEGIN TIM1_MspPostInit 0 */
+  /* PA9/PA10 复用 TIM1 CH2/CH3，分别连接驱动 IN2/IN1。 */
 
   /* USER CODE END TIM1_MspPostInit 0 */
 
@@ -263,6 +273,7 @@ void HAL_TIM_PWM_MspDeInit(TIM_HandleTypeDef* tim_pwmHandle)
   if(tim_pwmHandle->Instance==TIM1)
   {
   /* USER CODE BEGIN TIM1_MspDeInit 0 */
+  /* 关闭 TIM1 外设时钟；应用停机应先调用电机 Stop 或故障停机接口。 */
 
   /* USER CODE END TIM1_MspDeInit 0 */
     /* Peripheral clock disable */
@@ -279,6 +290,7 @@ void HAL_TIM_Encoder_MspDeInit(TIM_HandleTypeDef* tim_encoderHandle)
   if(tim_encoderHandle->Instance==TIM3)
   {
   /* USER CODE BEGIN TIM3_MspDeInit 0 */
+  /* 关闭编码器定时器并释放 AB 输入引脚。 */
 
   /* USER CODE END TIM3_MspDeInit 0 */
     /* Peripheral clock disable */
@@ -302,6 +314,7 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
   if(tim_baseHandle->Instance==TIM14)
   {
   /* USER CODE BEGIN TIM14_MspDeInit 0 */
+  /* 关闭调度定时器时钟和对应 NVIC 中断。 */
 
   /* USER CODE END TIM14_MspDeInit 0 */
     /* Peripheral clock disable */

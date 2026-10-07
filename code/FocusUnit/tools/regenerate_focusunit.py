@@ -5,6 +5,9 @@ Seed those staging folders with current Core files to preserve USER CODE, then
 install only the known generated files. Modules, startup, Drivers, and IDE
 metadata are never replaced. The staging directory and complete log are kept.
 """
+# 旧集中式 Core 生成流程：先在临时目录生成、验证 USER CODE，再复制六个文件。
+# 当前 CMake 工程已拆分 adc/tim/usart；本脚本仍在 main/MSP 中检查外设参数，
+# 尚未适配拆分结构。本轮仅补注释，不运行生成或覆盖当前外设文件。
 import argparse
 from pathlib import Path
 import re

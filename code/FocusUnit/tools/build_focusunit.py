@@ -3,6 +3,8 @@
 PowerShell: python tools/build_focusunit.py --configuration Release
 An STM32CubeIDE GNU Tools for STM32 installation or --toolchain is required.
 """
+# 完整编译 Cortex-M0 固件到 .build；默认查找 CubeIDE 工具链，支持 --toolchain。
+# Debug/Release 均使用 -Os 和 LTO；此入口的源清单/启动文件与 CMake 不完全相同。
 import argparse
 import json
 import os

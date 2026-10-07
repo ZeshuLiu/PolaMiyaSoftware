@@ -2,10 +2,22 @@ idf_component_register(
     SRCS
         "main.c"
         "drivers/st7789/lcd_st7789.c"
+        "drivers/hc165/hc165.c"
+        "drivers/hc165/hc165_keys.c"
+        "drivers/eeprom/eeprom.c"
+        "drivers/flash_trigger/flash_trigger.c"
+        "app/settings/settings.c"
+        "app/settings/settings_record.c"
+        "app/display/display.c"
         "app/lcd_test/lcd_test.c"
     INCLUDE_DIRS
         "."
         "drivers/st7789"
+        "drivers/hc165"
+        "drivers/eeprom"
+        "drivers/flash_trigger"
+        "app/settings"
+        "app/display"
         "app/lcd_test"
-    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio freertos heap
+    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_i2c esp_driver_rmt esp_timer freertos esp_rom
 )

@@ -16,6 +16,7 @@
   *
   ******************************************************************************
   */
+/* 全局底层支持配置；各外设的 MSP 初始化已拆分到 adc/tim/usart.c。 */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -63,6 +64,7 @@ void HAL_MspInit(void)
 {
 
   /* USER CODE BEGIN MspInit 0 */
+  /* 使能 SYSCFG 和 PWR 时钟，具体外设引脚/时钟由对应 MSP 配置。 */
 
   /* USER CODE END MspInit 0 */
 
