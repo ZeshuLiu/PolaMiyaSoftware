@@ -1,6 +1,6 @@
 # PolaMiyaSoftware - 宝丽来相机改装项目
 
-宝丽来相机自动化改装项目的软件仓库。当前主控器为 PM_Controller Rev2.0，使用 ESP32-S3-WROOM-1-N16R8；第一代 STM32 固件保存在历史归档中。
+宝丽来相机自动化改装项目的软件仓库。当前主控器为 PM_Controller Rev2.0，使用 ESP32-S3-WROOM-1-N8R8；第一代 STM32 固件保存在历史归档中。
 
 完整项目（含机械/电路设计）：https://github.com/ZeshuLiu/PolaMiya
 
@@ -10,8 +10,8 @@
 
 | 目录 | 对应硬件 / MCU | 状态 |
 | --- | --- | --- |
-| [code/PM_Controller](code/PM_Controller/) | 第二代主控器 PM_Controller Rev2.0 / ESP32-S3-WROOM-1-N16R8 | 官方 LVGL 移植组件与 ST7789 屏幕测试，已配置双 OTA 分区 |
-| [code/FocusUnit](code/FocusUnit/) | 独立对焦组件 / STM32F030F4Px | 独立维护，兼容性按组件硬件版本确认 |
+| [code/PM_Controller](code/PM_Controller/) | 第二代主控器 PM_Controller Rev2.0 / ESP32-S3-WROOM-1-N8R8 | 官方 LVGL 移植组件与 ST7789 屏幕测试，已配置双 OTA 分区 |
+| [code/FocusUnit](code/FocusUnit/) | 独立对焦组件 / STM32F030F4Px | 寻零校验、重试及开环控制已实现，用户确认测试没有问题 |
 | [code/Scripts](code/Scripts/) | 辅助计算脚本 | 按脚本用途使用 |
 | [archive/PM_Controller_Rev1_x](archive/PM_Controller_Rev1_x/) | 第一代主控系统 / STM32G474 + STM32L011 | 历史固件归档，不适用于第二代主控器 |
 | [GuiGuider/MainControl](GuiGuider/MainControl/) | 现有 GUI Guider 界面设计资源 | 保留原位置；用于新主控前需确认移植适配 |

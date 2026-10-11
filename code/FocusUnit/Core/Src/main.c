@@ -51,14 +51,14 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-/* SWD 观察变量：主循环从模块一致快照复制；当前没有串口业务。
- * 这些应用层副本便于调试，ISR 如需一致数据应调用模块 GetSnapshot。 */
+/* SWD 观察变量由主循环复制，当前没有串口业务。
+ * ADC 和编码器快照仅在主循环读取；这些副本用于调试观察。 */
 volatile FocusAdcMeasurement g_focus_adc_measurement;
 volatile FocusEncoderMeasurement g_focus_encoder_measurement;
 volatile FocusMotor_Snapshot g_focus_motor_state;
 volatile FocusSchedulerStatus g_focus_scheduler_status;
 volatile uint32_t g_focus_fault; /* 1=ADC，2=编码器，3=电机，4=调度，5=其他初始化错误 */
-/* SWD 置 1 后由下一次编码器任务原子消费并清零；C 接口也可调用 Zero。 */
+/* SWD 置 1 后由下一次编码器任务消费并清零；C 接口也可调用 Zero。 */
 volatile uint8_t g_focus_encoder_zero_request;
 /* USER CODE END PV */
 
@@ -122,7 +122,8 @@ int main(void)
   __HAL_DBGMCU_FREEZE_TIM14();
   __HAL_DBGMCU_FREEZE_TIM3();
   /* 调试暂停时冻结调度/编码器，但保持 PWM，避免冻结在持续驱动电平。
-     断点不是停机命令，暂停前需在主循环调用 FocusMotor_Stop。 */
+     断点不是停机命令；正常状态可调用 Stop，寻零期间 Stop 不会取消初始化。
+     暂停调度也会暂停反向退回计时，寻零中不能用断点验证实际驱动时长。 */
   __HAL_DBGMCU_UNFREEZE_TIM1();
   /* 先校准 ADC、启动编码器和电机，最后启动调度时基；任一失败进入故障停机。 */
   if (FocusAdc_Init(&hadc) != HAL_OK)
@@ -135,7 +136,7 @@ int main(void)
     g_focus_fault = 2U;
     Error_Handler();
   }
-  if (FocusMotor_Init(&htim1, 0U) != HAL_OK)
+  if (FocusMotor_Init(&htim1) != HAL_OK)
   {
     g_focus_fault = 3U;
     Error_Handler();
@@ -159,38 +160,38 @@ int main(void)
     FocusAdcMeasurement adc_snapshot;
     if ((dispatch.flags & FOCUS_TASK_ENCODER) != 0U)
     {
-      FocusEncoderMeasurement encoder_snapshot;
       FocusEncoder_Update(dispatch.now_ms);
-      /* 领取软件置零请求，避免读取与清除之间被异步请求覆盖。 */
-      const uint32_t irq_state = __get_PRIMASK();
-      __disable_irq();
+      /* 寻零期间不能外部置零破坏比较基准；错误锁存时也不响应置零指令。 */
       const uint8_t zero_requested = g_focus_encoder_zero_request;
       g_focus_encoder_zero_request = 0U;
-      __set_PRIMASK(irq_state);
-      if (zero_requested != 0U)
+      if ((zero_requested != 0U) &&
+          (FocusMotor_State.work_state == FOCUS_MOTOR_WORK_NORMAL))
       {
         FocusEncoder_Zero();
       }
-      FocusEncoder_GetSnapshot(&encoder_snapshot);
-      g_focus_encoder_measurement = encoder_snapshot;
     }
-    /* 每轮处理采集完成/错误/超时，不必等到下一次 100 ms 请求。 */
+    /* 每轮处理 ADC 完整帧或 HAL 错误。 */
     FocusAdc_Process(dispatch.now_ms);
-    if ((dispatch.flags & FOCUS_TASK_MOTOR) != 0U)
-    {
-      FocusMotor_Snapshot motor_snapshot;
-      FocusMotor_Update(dispatch.now_ms);
-      FocusMotor_GetSnapshot(&motor_snapshot);
-      g_focus_motor_state = motor_snapshot;
-    }
     if (FocusAdc_GetSnapshot(&adc_snapshot) != 0U)
     {
       g_focus_adc_measurement = adc_snapshot;
     }
+    /* 调度器每 10 ms 触发一次，电机模块自行管理模式和堵转置零。 */
+    if ((dispatch.flags & FOCUS_TASK_MOTOR) != 0U)
+    {
+      FocusMotor_Step(dispatch.now_ms);
+      g_focus_motor_state = FocusMotor_State;
+    }
+    {
+      /* Step 可能建立编码器零位，当轮同步观察副本。 */
+      FocusEncoderMeasurement encoder_snapshot;
+      FocusEncoder_GetSnapshot(&encoder_snapshot);
+      g_focus_encoder_measurement = encoder_snapshot;
+    }
     if ((dispatch.flags & FOCUS_TASK_ADC) != 0U)
     {
       FocusSchedulerStatus scheduler_snapshot;
-      /* 忙时跳过本次请求，启动失败由 ADC 发布；不阻塞其他任务重试。 */
+      /* 上一帧未处理完则跳过本次请求，不阻塞其他任务。 */
       (void)FocusAdc_Request(dispatch.now_ms);
       FocusScheduler_GetSnapshot(&scheduler_snapshot);
       g_focus_scheduler_status = scheduler_snapshot;

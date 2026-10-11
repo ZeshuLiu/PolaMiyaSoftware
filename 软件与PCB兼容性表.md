@@ -6,8 +6,8 @@
 | --- | --- | --- | --- | --- |
 | PM_Controller Rev1.x：主控 | Rev1.3 | STM32G474RE | [MainController](archive/PM_Controller_Rev1_x/MainController/) | 已归档，本次未复测 |
 | PM_Controller Rev1.x：电源管理 | Rev1.3 | STM32L011D4 | [PowerManage](archive/PM_Controller_Rev1_x/PowerManage/) | 已归档，本次未复测 |
-| PM_Controller Rev2.x | Rev2.0 | ESP32-S3-WROOM-1-N16R8 | [PM_Controller](code/PM_Controller/) | 官方 LVGL 移植组件与 ST7789 屏幕测试，已配置双 OTA 分区 |
-| Focus Unit Drive Rev1.x | Rev1.0 | STM32F030F4 | [FocusUnit](code/FocusUnit/) | 初步测试通过，与新主控的通信尚未实现 |
+| PM_Controller Rev2.x | Rev2.0 | ESP32-S3-WROOM-1-N8R8 | [PM_Controller](code/PM_Controller/) | 官方 LVGL 移植组件与 ST7789 屏幕测试，已配置双 OTA 分区 |
+| Focus Unit Drive Rev1.x | Rev1.0 | STM32F030F4 | [FocusUnit](code/FocusUnit/) | 寻零及开环控制用户确认测试没有问题，与新主控的通信尚未实现 |
 
 - 旧主控实际使用 STM32G474RE，与原 STM32G431RB 引脚兼容、性能更高。硬件文件仍标注 G431RB，固件按 G474RE 配置。
 - `PM_Controller_Rev1_x` 是第一代归档目录。内部工程名 `MainController2`、`PowerManage2` 中的 `2` 不代表第二代硬件；其他 Rev1.x 板卡需另行核对。

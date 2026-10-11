@@ -1,6 +1,6 @@
 # PM_Controller 固件
 
-对应 PCB：PM_Controller Rev2.x，当前为 Rev2.0。模组：ESP32-S3-WROOM-1-N16R8，16 MB Flash、8 MB Octal PSRAM。开发环境为 ESP-IDF 6.1。
+对应 PCB：PM_Controller Rev2.x，当前为 Rev2.0。模组：ESP32-S3-WROOM-1-N8R8，8 MB Flash、8 MB Octal PSRAM。开发环境为 ESP-IDF 6.1。
 
 `app_main()` 将闪光输出初始化为低电平，启动 74HC165 按键扫描，加载 24C64 参数，初始化官方 ST7789 驱动和 LVGL，并启动屏幕方向与偏移测试。按键事件供外部读取，尚未接入 LVGL 菜单。参数修改与持久化提交分开。引脚和双 OTA 分区已整理，电机、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
 
@@ -21,7 +21,7 @@
 | [main/app/display/](main/app/display/) | 官方 esp_lvgl_port 初始化和显示配置 |
 | [main/app/lcd_test/](main/app/lcd_test/) | LVGL 测试控件和定时切换 |
 | [main/idf_component.yml](main/idf_component.yml) | 固定官方移植组件和 LVGL 版本 |
-| [partitions.csv](partitions.csv) | 16 MB Flash 自定义分区表 |
+| [partitions.csv](partitions.csv) | 8 MB Flash 自定义分区表 |
 | CMakeLists.txt、main/CMakeLists.txt | ESP-IDF 构建配置 |
 | sdkconfig | 本机配置，当前不纳入 Git；sdkconfig.defaults 后续再整理 |
 
@@ -65,7 +65,7 @@
 
 74HC165 驱动已接入启动流程。6 个按键采用 20 ms 消抖，短按在松开时触发，长按在持续达到 1 s 时触发一次；事件通过 `hc165_get_events()` 或 `hc165_take_events()` 读取。接口与使用示例见[驱动说明](main/drivers/hc165/README.md)，各驱动进度见[驱动实现状态](驱动实现状态.md)。
 
-- GPIO35/36/37 由 N16R8 的 PSRAM 占用，不能用于外设。
+- GPIO35/36/37 由 N8R8 的 PSRAM 占用，不能用于外设。
 - GPIO45/46/47/48 在本 PCB 上未接。GPIO45/46 是启动配置脚，不作为普通空闲引脚使用。
 - GPIO0 是 BOOT 启动配置脚；GPIO3 同时影响 JTAG 选择。使用电池 ADC 时不要随意改变相关 eFuse。
 - GPIO39–42 已用于板上功能，调试使用 USB Serial/JTAG。GPIO19/20 使用 USB 时不能另作 GPIO。
@@ -129,14 +129,14 @@ PCB、PIN.h 和文档中的 29 个 GPIO 对应一致；分区表已通过 ESP-ID
 | nvs | 0x9000 | 64 KB | 参数、Wi-Fi 配置、射频校准数据 |
 | otadata | 0x19000 | 8 KB | OTA 启动槽与升级状态 |
 | phy_init | 0x1B000 | 4 KB | 预留 PHY 初始化数据，当前未使用 |
-| ota_0 | 0x20000 | 4 MB | 固件槽 A，首次烧录位置 |
-| ota_1 | 0x420000 | 4 MB | 固件槽 B |
+| ota_0 | 0x20000 | 3 MB | 固件槽 A，首次烧录位置 |
+| ota_1 | 0x320000 | 3 MB | 固件槽 B |
 
-0x820000 起剩余 7.875 MB 暂不分配。不设 factory 分区；OTA 状态区为空时从 ota_0 启动。OTA 接收、校验和新固件确认逻辑尚未实现，自动回滚暂未启用。
+0x620000 起剩余 1.875 MB 暂不分配。不设 factory 分区；OTA 状态区为空时从 ota_0 启动。OTA 接收、校验和新固件确认逻辑尚未实现，自动回滚暂未启用。
 
 ## 配置与构建
 
-在 ESP-IDF 终端中进入本目录。目标为 esp32s3；Flash 设为 16 MB、QIO、80 MHz，PSRAM 设为 Octal、80 MHz。
+在 ESP-IDF 终端中进入本目录。目标为 esp32s3；Flash 设为 8 MB、QIO、80 MHz，PSRAM 设为 Octal、80 MHz。2026-10-08 按采购的 N8R8 调整分区表，本机 sdkconfig 的 Flash 容量仍须手动从 16 MB 改为 8 MB。
 
 在 `menuconfig → Partition Table` 选择 `Custom partition table CSV`，文件名为 `partitions.csv`，偏移为 `0x8000`。本机 sdkconfig 已设置。
 

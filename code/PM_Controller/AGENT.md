@@ -1,6 +1,6 @@
 # PM_Controller 工程约定
 
-更新：2026-10-07。适用范围：`code/PM_Controller/`，PM_Controller Rev2.x，当前 PCB 为 Rev2.0。
+更新：2026-10-08。适用范围：`code/PM_Controller/`，PM_Controller Rev2.x，当前 PCB 为 Rev2.0。
 
 ## 开发要求
 
@@ -23,9 +23,9 @@
 
 | 项目 | 当前约定 |
 | --- | --- |
-| 主控 | ESP32-S3-WROOM-1-N16R8；Rev2 主控不含 STM32 |
+| 主控 | ESP32-S3-WROOM-1-N8R8；Rev2 主控不含 STM32 |
 | SDK | ESP-IDF 6.1 |
-| 存储 | 16 MB Flash；8 MB Octal PSRAM |
+| 存储 | 8 MB Flash；8 MB Octal PSRAM |
 | 图形依赖 | `espressif/esp_lvgl_port 2.9.0`、`lvgl/lvgl 9.3.0`，由 `main/idf_component.yml` 固定 |
 | 入口 | `main/main.c`；源文件、包含目录及依赖在 `main/CMakeLists.txt` 注册 |
 | 历史固件 | `../../archive/PM_Controller_Rev1_x/`，冻结保存，仅作参考 |
@@ -99,9 +99,9 @@ flash_trigger_init → hc165_init → settings_init
 
 ## 配置、分区与修改范围
 
-- GPIO35/36/37 由 N16R8 Octal PSRAM 占用；GPIO19/20 保留给原生 USB。GPIO39–42 已用于板上功能，调试使用 USB Serial/JTAG。
+- GPIO35/36/37 由 N8R8 Octal PSRAM 占用；GPIO19/20 保留给原生 USB。GPIO39–42 已用于板上功能，调试使用 USB Serial/JTAG。
 - GPIO0 是 BOOT；GPIO3 同时是电池 ADC 与 JTAG 相关启动配置脚，不随意修改相关 eFuse。
-- `partitions.csv` 是 16 MB Flash 布局：两个 4 MB OTA 槽位于 `0x20000` 和 `0x420000`，`0x820000` 起暂未分配。OTA 业务尚未实现。
+- `partitions.csv` 是 8 MB Flash 布局：两个 3 MB OTA 槽位于 `0x20000` 和 `0x320000`，`0x620000` 起暂未分配。OTA 业务尚未实现。本机 sdkconfig 的 Flash 容量仍须用户手动改为 8 MB。
 - `dependencies.lock` 由组件管理器生成；依赖版本变更同步清单与文档，不手工改写托管组件源码。
 - 保留用户已有改动和其它并行工作，不修改独立 FocusUnit、历史归档或硬件工程，除非当前请求明确包含。
 - 未明确要求时不主动提交 Git 或推送。请求提交时，只暂存授权范围，并先更新受影响文档。

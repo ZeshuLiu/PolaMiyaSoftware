@@ -42,12 +42,14 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined library search paths
 )
 
-# 将四个按功能分目录的业务模块加入最终固件，CubeMX 生成清单不自动包含它们。
+# 将业务模块及电机实机测试波形加入固件，CubeMX 不自动包含这些文件。
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/FocusUnit/Adc/focus_adc.c
     Core/Src/FocusUnit/Encoder/focus_encoder.c
     Core/Src/FocusUnit/Motor/focus_motor.c
+    Core/Src/FocusUnit/Motor/focus_motor_home.c
+    Core/Src/FocusUnit/Motor/test.c
     Core/Src/FocusUnit/Scheduler/focus_scheduler.c
 )
 
