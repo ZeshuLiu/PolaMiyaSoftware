@@ -2,7 +2,7 @@
 #define PM_SDM50_H
 
 // #include <stdbool.h>
-// #include <stdint.h>
+#include <stdint.h>
 #include "esp_err.h"
 
 typedef enum {
