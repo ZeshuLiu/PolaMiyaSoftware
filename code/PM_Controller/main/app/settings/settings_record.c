@@ -111,7 +111,7 @@ static uint32_t record_crc(const uint8_t *record)
     return crc ^ UINT32_MAX;
 }
 
-esp_err_t settings_record_encode(const settings_values_t *values, uint32_t sequence,
+void settings_record_encode(const settings_values_t *values, uint32_t sequence,
                                  uint8_t record[SETTINGS_RECORD_BYTES])
 {
     memset(record, 0xFF, SETTINGS_RECORD_BYTES);
@@ -122,9 +122,6 @@ esp_err_t settings_record_encode(const settings_values_t *values, uint32_t seque
     for (size_t i = 0; i < PARAMETER_COUNT; ++i) {
         uint64_t value;
         memcpy(&value, (const uint8_t *)values + parameters[i].offset, sizeof(value));
-        if (value > parameters[i].maximum) {
-            return ESP_ERR_INVALID_ARG;
-        }
         uint8_t *entry = record + SETTINGS_HEADER_BYTES + i * ENTRY_BYTES;
         write_le(entry, parameters[i].key, 2);
         write_le(entry + 2, 8, 2);
@@ -132,10 +129,9 @@ esp_err_t settings_record_encode(const settings_values_t *values, uint32_t seque
     }
     write_le(record + 12, record_crc(record), 4);
     write_le(record + SETTINGS_COMMIT_OFFSET, COMMIT_MAGIC, SETTINGS_COMMIT_BYTES);
-    return ESP_OK;
 }
 
-bool settings_record_valid(const uint8_t record[SETTINGS_RECORD_BYTES], uint32_t *sequence)
+static bool settings_record_valid(const uint8_t record[SETTINGS_RECORD_BYTES], uint32_t *sequence)
 {
     if (read_le(record, 4) != RECORD_MAGIC ||
         settings_record_body_size(record) > SETTINGS_COMMIT_OFFSET ||
@@ -147,10 +143,10 @@ bool settings_record_valid(const uint8_t record[SETTINGS_RECORD_BYTES], uint32_t
     return true;
 }
 
-esp_err_t settings_record_decode(const uint8_t record[SETTINGS_RECORD_BYTES], settings_values_t *values)
+esp_err_t settings_record_decode(const uint8_t record[SETTINGS_RECORD_BYTES],
+                                 settings_values_t *values, uint32_t *sequence)
 {
-    uint32_t sequence;
-    if (!settings_record_valid(record, &sequence)) {
+    if (!settings_record_valid(record, sequence)) {
         return ESP_ERR_INVALID_CRC;
     }
     if (read_le(record + 4, 2) != SETTINGS_RECORD_VERSION) {

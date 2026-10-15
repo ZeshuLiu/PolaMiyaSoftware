@@ -8,7 +8,7 @@
 
 void lcd_st7789_backlight(bool on)
 {
-    ESP_ERROR_CHECK(gpio_set_level(PIN_LCD_BLK, on ? 0 : 1));
+    gpio_set_level(PIN_LCD_BLK, on ? 0 : 1);
 }
 
 void lcd_st7789_init(lcd_st7789_t *lcd)

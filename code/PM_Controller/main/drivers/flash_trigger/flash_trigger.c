@@ -1,52 +1,32 @@
 #include "flash_trigger.h"
 
 #include "PIN.h"
-#include "driver/rmt_tx.h"
-#include "driver/rmt_encoder.h"
+#include "driver/gptimer.h"
 #include "esp_attr.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 
-#define FLASH_RMT_RESOLUTION_HZ 1000000U /* One tick is one microsecond. */
-
-/* RMT keeps the payload pointer until transmission finishes. Keep both the
- * payload and callback state in internal RAM, not on the caller's stack. */
 static DRAM_ATTR struct {
-    rmt_channel_handle_t channel;
-    rmt_encoder_handle_t encoder;
-    rmt_symbol_word_t pulse;
+    gptimer_handle_t timer;
     bool initialized;
     bool busy;
-    bool submitting;
+    int64_t ready_after_us;
 } flash;
 static DRAM_ATTR portMUX_TYPE flash_lock = portMUX_INITIALIZER_UNLOCKED;
 
-static bool IRAM_ATTR transmit_done(rmt_channel_handle_t channel,
-                                    const rmt_tx_done_event_data_t *event, void *context)
+static bool IRAM_ATTR pulse_done(gptimer_handle_t timer,
+                                 const gptimer_alarm_event_data_t *event, void *context)
 {
-    (void)channel;
     (void)event;
     (void)context;
     portENTER_CRITICAL_ISR(&flash_lock);
+    gpio_set_level(PIN_FLASH_TRG, 0);
+    gptimer_stop(timer);
+    /* Recovery starts at the actual falling edge, even if this ISR was late. */
+    flash.ready_after_us = esp_timer_get_time() + FLASH_TRIGGER_RECOVERY_US;
     flash.busy = false;
     portEXIT_CRITICAL_ISR(&flash_lock);
     return false;
-}
-
-static void release_resources(void)
-{
-    if (flash.encoder) {
-        rmt_del_encoder(flash.encoder);
-        flash.encoder = NULL;
-    }
-    if (flash.channel) {
-        rmt_del_channel(flash.channel);
-        flash.channel = NULL;
-    }
-    /* On initialization failure, release the output and keep it pulled low.
-     * R24 also provides a board-level 10 kOhm pull-down. */
-    gpio_set_direction(PIN_FLASH_TRG, GPIO_MODE_INPUT);
-    gpio_pullup_dis(PIN_FLASH_TRG);
-    gpio_pulldown_en(PIN_FLASH_TRG);
 }
 
 esp_err_t flash_trigger_init(void)
@@ -54,42 +34,37 @@ esp_err_t flash_trigger_init(void)
     if (flash.initialized) {
         return ESP_OK;
     }
-    esp_err_t result = gpio_set_level(PIN_FLASH_TRG, 0);
+    gpio_set_level(PIN_FLASH_TRG, 0);
+    const gpio_config_t output = {
+        .pin_bit_mask = 1ULL << PIN_FLASH_TRG,
+        .mode = GPIO_MODE_OUTPUT,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    esp_err_t result = gpio_config(&output);
     if (result != ESP_OK) {
         return result;
     }
-    const rmt_tx_channel_config_t channel_config = {
-        .gpio_num = PIN_FLASH_TRG,
-        .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = FLASH_RMT_RESOLUTION_HZ,
-        .mem_block_symbols = 48,
-        .trans_queue_depth = 1,
-        .flags.init_level = 0,
+    const gptimer_config_t config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+        .direction = GPTIMER_COUNT_UP,
+        .resolution_hz = 1000000,
     };
-    result = rmt_new_tx_channel(&channel_config, &flash.channel);
+    result = gptimer_new_timer(&config, &flash.timer);
     if (result != ESP_OK) {
-        goto fail;
+        return result;
     }
-    const rmt_copy_encoder_config_t encoder_config = {};
-    result = rmt_new_copy_encoder(&encoder_config, &flash.encoder);
-    if (result != ESP_OK) {
-        goto fail;
+    const gptimer_event_callbacks_t callbacks = {.on_alarm = pulse_done};
+    result = gptimer_register_event_callbacks(flash.timer, &callbacks, NULL);
+    if (result == ESP_OK) {
+        result = gptimer_enable(flash.timer);
     }
-    const rmt_tx_event_callbacks_t callbacks = {.on_trans_done = transmit_done};
-    result = rmt_tx_register_event_callbacks(flash.channel, &callbacks, &flash);
     if (result != ESP_OK) {
-        goto fail;
-    }
-    result = rmt_enable(flash.channel);
-    if (result != ESP_OK) {
-        goto fail;
+        gptimer_del_timer(flash.timer);
+        flash.timer = NULL;
+        return result;
     }
     flash.initialized = true;
     return ESP_OK;
-
-fail:
-    release_resources();
-    return result;
 }
 
 esp_err_t flash_trigger_fire_us(uint32_t pulse_us)
@@ -97,36 +72,28 @@ esp_err_t flash_trigger_fire_us(uint32_t pulse_us)
     if (pulse_us < FLASH_TRIGGER_MIN_US || pulse_us > FLASH_TRIGGER_MAX_US) {
         return ESP_ERR_INVALID_ARG;
     }
-    portENTER_CRITICAL(&flash_lock);
-    if (!flash.initialized || flash.busy || flash.submitting) {
-        portEXIT_CRITICAL(&flash_lock);
+    portENTER_CRITICAL_SAFE(&flash_lock);
+    if (!flash.initialized || flash.busy || esp_timer_get_time() < flash.ready_after_us) {
+        portEXIT_CRITICAL_SAFE(&flash_lock);
         return ESP_ERR_INVALID_STATE;
     }
-    flash.pulse = (rmt_symbol_word_t){
-        .duration0 = pulse_us,
-        .level0 = 1,
-        .duration1 = FLASH_TRIGGER_RECOVERY_US,
-        .level1 = 0,
-    };
     flash.busy = true;
-    flash.submitting = true;
-    portEXIT_CRITICAL(&flash_lock);
-
-    const rmt_transmit_config_t transmit_config = {
-        .loop_count = 0,
-        .flags.eot_level = 0,
-        .flags.queue_nonblocking = true,
-    };
-    const esp_err_t result = rmt_transmit(flash.channel, flash.encoder, &flash.pulse,
-                                         sizeof(flash.pulse), &transmit_config);
-    /* A completion ISR can arrive before rmt_transmit() returns. Keep the
-     * submission gate closed until the driver call has finished as well. */
-    portENTER_CRITICAL(&flash_lock);
+    /* Raise the output before configuring its end time: no task handoff. */
+    gpio_set_level(PIN_FLASH_TRG, 1);
+    esp_err_t result = gptimer_set_raw_count(flash.timer, 0);
+    const gptimer_alarm_config_t alarm = {.alarm_count = pulse_us};
+    if (result == ESP_OK) {
+        result = gptimer_set_alarm_action(flash.timer, &alarm);
+    }
+    if (result == ESP_OK) {
+        result = gptimer_start(flash.timer);
+    }
     if (result != ESP_OK) {
+        gpio_set_level(PIN_FLASH_TRG, 0);
+        flash.ready_after_us = esp_timer_get_time() + FLASH_TRIGGER_RECOVERY_US;
         flash.busy = false;
     }
-    flash.submitting = false;
-    portEXIT_CRITICAL(&flash_lock);
+    portEXIT_CRITICAL_SAFE(&flash_lock);
     return result;
 }
 
@@ -137,8 +104,8 @@ esp_err_t flash_trigger_fire(void)
 
 bool flash_trigger_is_busy(void)
 {
-    portENTER_CRITICAL(&flash_lock);
-    const bool busy = flash.busy || flash.submitting;
-    portEXIT_CRITICAL(&flash_lock);
+    portENTER_CRITICAL_SAFE(&flash_lock);
+    const bool busy = flash.busy || esp_timer_get_time() < flash.ready_after_us;
+    portEXIT_CRITICAL_SAFE(&flash_lock);
     return busy;
 }

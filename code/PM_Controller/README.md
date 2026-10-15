@@ -1,12 +1,18 @@
 # PM_Controller 固件
 
-对应 PCB：PM_Controller Rev2.x，当前为 Rev2.0。模组：ESP32-S3-WROOM-1-N8R8，8 MB Flash、8 MB Octal PSRAM。开发环境为 ESP-IDF 6.1。
+对应 PCB：PM_Controller Rev2.x，当前为 Rev2.0。模组：ESP32-S3-WROOM-1-N8R8，8 MB Flash、8 MB Octal PSRAM。开发环境为 ESP-IDF 6.1。当前 FreeRTOS tick 为 1 kHz（`CONFIG_FREERTOS_HZ=1000`）；按键扫描目标周期 5 ms，EEPROM 忙等待延时为 1 tick。消抖、长按、LVGL 定时与 GPTimer 目标脉宽仍按各自的时间单位配置。
 
-`app_main()` 将闪光输出初始化为低电平，启动 74HC165 按键扫描，加载 24C64 参数，初始化官方 ST7789 驱动和 LVGL，并启动屏幕方向与偏移测试。按键事件供外部读取，尚未接入 LVGL 菜单。参数修改与持久化提交分开。引脚和双 OTA 分区已整理，电机、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
+`app_main()` 将闪光输出初始化为低电平，接入 GPIO42 快门下降沿中断，启动 74HC165 按键扫描，加载 24C64 参数，初始化官方 ST7789 驱动和 LVGL，并启动屏幕方向与偏移测试。按键事件供外部读取，尚未接入 LVGL 菜单。参数修改与持久化提交分开。引脚和双 OTA 分区已整理，电机、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
 
 2026-10-07：按用户要求移除本地主机测试、桩及测试缓存，保留固件内的屏幕方向与偏移测试。下文主机测试结果为清理前的验证记录。
 
+2026-10-15：参数加载合并重复校验，编码使用入口已验证的 RAM 值，三阶段保存共用写入回读函数；保留稳定 ID、版本兼容、轮换记录和旧版导入。按键扫描与背光开关移除固定 GPIO 操作的逐次错误检查，初始化检查保留。HC165 改为 SPI3、Mode 2、500 kHz 硬件读取并启用 DMA，GPIO 单独控制 /PL，按键事件规则不变。本轮用户确认编译通过；未运行测试，未上板验证。
+
+2026-10-15 提交状态：用户确认当前固件可编译，未上板验证；本轮未代为构建或运行测试。`.clangd` 保存编辑器参数过滤和 Picolibc 头文件路径；本机 `.vscode/settings.json` 按现有规则忽略，其中使用 Espressif clangd 并关闭重复 IntelliSense。工具链升级或换机后需调整路径。
+
 ## 工程文件
+
+2026-10-15：新增 [SDM50 测距驱动](main/drivers/sdm50/README.md)，UART1（GPIO4/5）、460800 baud、UHCI DMA 收发。DMA 中断直接解析并更新距离，同核任务负责 EOF 后重新挂载；提供启停应答和带时间戳的结果快照。开机初始化并尝试开启测距，失败记录警告后继续启动。用户确认编译通过；未运行测试，未上板验证。
 
 | 文件 | 用途 |
 | --- | --- |
@@ -16,7 +22,9 @@
 | [main/drivers/st7789/](main/drivers/st7789/) | SPI、官方 ST7789 驱动初始化和背光 |
 | [main/drivers/hc165/](main/drivers/hc165/README.md) | 74HC165 读取、6 个按键消抖及长短按标志位 |
 | [main/drivers/eeprom/](main/drivers/eeprom/README.md) | 官方 I²C、24C64 分页读写及写完成轮询 |
-| [main/drivers/flash_trigger/](main/drivers/flash_trigger/README.md) | 官方 RMT 单次闪光脉冲、忙状态及默认低电平 |
+| [main/drivers/flash_trigger/](main/drivers/flash_trigger/README.md) | GPIO 直接触发、GPTimer 中断结束、忙状态及默认低电平 |
+| [main/drivers/sdm50/](main/drivers/sdm50/README.md) | UART1/UHCI DMA 测距、中断更新结果和启停应答 |
+| [main/app/shutter/](main/app/shutter/) | GPIO42 快门下降沿 ISR 直接触发闪光 |
 | [main/app/settings/](main/app/settings/README.md) | 参数定义、RAM 缓存、CRC、轮换保存与旧版导入 |
 | [main/app/display/](main/app/display/) | 官方 esp_lvgl_port 初始化和显示配置 |
 | [main/app/lcd_test/](main/app/lcd_test/) | LVGL 测试控件和定时切换 |
@@ -63,7 +71,7 @@
 
 74HC165 的并行输入 D0–D7 依次为 KEY1、KEY2、KEY3、KEY4、KEY5、KEY6、BAT_CHG_OD、BAT_STB_OD。这些信号不直接占用 MCU GPIO。MASPI_CS 实际是 /PL，不能按普通 SPI 片选处理。
 
-74HC165 驱动已接入启动流程。6 个按键采用 20 ms 消抖，短按在松开时触发，长按在持续达到 1 s 时触发一次；事件通过 `hc165_get_events()` 或 `hc165_take_events()` 读取。接口与使用示例见[驱动说明](main/drivers/hc165/README.md)，各驱动进度见[驱动实现状态](驱动实现状态.md)。
+74HC165 驱动已接入启动流程，使用 SPI3（Mode 2、500 kHz、8 bit、DMA 接收、轮询等待完成），与屏幕 SPI2 独立。6 个按键采用 20 ms 消抖，短按在松开时触发，长按在持续达到 1 s 时触发一次；事件通过 `hc165_get_events()` 或 `hc165_take_events()` 读取。接口与使用示例见[驱动说明](main/drivers/hc165/README.md)，各驱动进度见[驱动实现状态](驱动实现状态.md)。
 
 - GPIO35/36/37 由 N8R8 的 PSRAM 占用，不能用于外设。
 - GPIO45/46/47/48 在本 PCB 上未接。GPIO45/46 是启动配置脚，不作为普通空闲引脚使用。
@@ -83,7 +91,7 @@
 
 依赖固定为 `espressif/esp_lvgl_port 2.9.0` 和 `lvgl/lvgl 9.3.0`，与本机 ESP-IDF SPI 屏幕示例及 GUI Guider 的 LVGL 主次版本一致。组件管理器在配置工程时下载依赖，不复制旧工程的 LVGL 源码。
 
-调用顺序：`app_main()` → `flash_trigger_init()` → `hc165_init()` → `settings_init()` → `lcd_st7789_init()` → `display_init()` → `lcd_test_start()`。闪光输出、按键和显示初始化失败通过 `ESP_ERROR_CHECK` 停止启动；参数存储失败记录错误并继续显示启动。参数锁成功分配后，器件错误时仍可使用 RAM 默认值，持久化提交被禁止。初始化接口只在开机时调用一次；显示和测试定时器持续运行，不提供运行中销毁或重复初始化接口。
+调用顺序：`app_main()` → `flash_trigger_init()` → `shutter_init()` → `hc165_init()` → `sdm50_init()` / `sdm50_start()` → `settings_init()` → `lcd_st7789_init()` → `display_init()` → `lcd_test_start()`。闪光输出、按键和显示初始化失败通过 `ESP_ERROR_CHECK` 停止启动；测距初始化或开启失败、参数存储失败记录警告并继续显示启动。参数锁成功分配后，器件错误时仍可使用 RAM 默认值，持久化提交被禁止。初始化接口只在开机时调用一次；显示和测试定时器持续运行，不提供运行中销毁或重复初始化接口。
 
 使用 ESP-IDF 官方 `esp_lcd_new_panel_st7789()`，SPI2、模式 0、20 MHz、RGB565。板级文件只配置引脚、SPI 和背光，直接输出官方 `panel`、`io` 句柄。LVGL 任务、时钟、刷新、字节交换、DMA 完成回调和硬件旋转由官方移植组件管理。
 
@@ -118,7 +126,9 @@ PCB、PIN.h 和文档中的 29 个 GPIO 对应一致；分区表已通过 ESP-ID
 
 2026-10-07：U12 按用户确认的 24C64 实现，8 KB、32 字节页、双字节地址、器件地址 0x50。EEPROM 和参数服务通过语法检查及 25 项主机测试，覆盖分页、忙等待、CRC、轮换、中断写入、未知版本保护和旧版导入。采用稳定参数 ID 与明确的小端编码，64 位统计量和背光参数缓存于 RAM，外部通过 `settings_commit()` 保存。启动只读，旧版区域保留。实料地址、实际断电恢复与跨任务行为尚未接板验证；校准字段和业务保存触发尚未接入。
 
-2026-10-07：闪光输出使用 GPIO38 和官方 RMT，默认高电平 20 ms、低电平恢复 1 ms，提供单次触发、1–30 ms 指定脉宽及忙状态接口。初始化只保持低电平，不自动触发；快门联动尚未接入。按用户要求停止后续测试和语法检查，移除本轮新增闪光测试文件。实机波形及外部闪光灯兼容性未验证。
+2026-10-07 历史实现：闪光输出使用 GPIO38 和官方 RMT，默认高电平 20 ms、低电平恢复 1 ms，提供单次触发、1–30 ms 指定脉宽及忙状态接口。初始化只保持低电平，不自动触发；快门联动尚未接入。按用户要求停止后续测试和语法检查，移除本轮新增闪光测试文件。实机波形及外部闪光灯兼容性未验证。
+
+2026-10-15：闪光改为 GPIO42 下降沿 ISR 直接拉高 GPIO38，GPTimer 报警 ISR 结束脉冲，不经过任务通知或 RMT。默认目标 20 ms、恢复期至少 1 ms；支持任务和 ISR 调用。当前不做额外触点消抖或回充判定；关中断和 Flash cache 暂停仍可能延迟响应。详见[闪光说明](main/drivers/flash_trigger/README.md)。本轮用户确认编译通过；未运行测试，未上板验证。
 
 ## Flash 分区
 

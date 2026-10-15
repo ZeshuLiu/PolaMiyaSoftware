@@ -6,7 +6,9 @@ idf_component_register(
         "drivers/hc165/hc165_keys.c"
         "drivers/eeprom/eeprom.c"
         "drivers/flash_trigger/flash_trigger.c"
+        "drivers/sdm50/sdm50.c"
         "app/settings/settings.c"
+        "app/shutter/shutter.c"
         "app/settings/settings_record.c"
         "app/display/display.c"
         "app/lcd_test/lcd_test.c"
@@ -16,8 +18,10 @@ idf_component_register(
         "drivers/hc165"
         "drivers/eeprom"
         "drivers/flash_trigger"
+        "drivers/sdm50"
         "app/settings"
+        "app/shutter"
         "app/display"
         "app/lcd_test"
-    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_i2c esp_driver_rmt esp_timer freertos esp_rom
+    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_timer freertos esp_rom
 )

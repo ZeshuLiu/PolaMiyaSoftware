@@ -13,8 +13,10 @@
 /* Initialize at startup before consumers. Initialization never fires a pulse. */
 esp_err_t flash_trigger_init(void);
 
-/* Task-context, nonblocking APIs. Busy requests return ESP_ERR_INVALID_STATE.
- * ESP_OK means accepted for transmission, not that the flash actually fired. */
+/* Task or normal GPIO ISR context; no task handoff or pulse-completion wait.
+ * Busy/recovery requests return ESP_ERR_INVALID_STATE. ESP_OK means the GPIO
+ * was raised and the end timer started, not that an external flash fired.
+ * Not cache-off safe with the current SDK configuration. */
 esp_err_t flash_trigger_fire(void);
 esp_err_t flash_trigger_fire_us(uint32_t pulse_us);
 bool flash_trigger_is_busy(void);

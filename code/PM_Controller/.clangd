@@ -1,0 +1,14 @@
+# Editor only. GCC obtains Picolibc headers through build/specs/picolibc.specs;
+# clangd does not interpret GCC specs files, so supply that include root explicitly.
+CompileFlags:
+  CompilationDatabase: build
+  Remove:
+    - -mdisable-hardware-atomics
+    - -specs=*
+    - -fno-malloc-dce
+    - -fzero-init-padding-bits=*
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
+  Add:
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-15.2.0_20251204/xtensa-esp-elf/picolibc/include

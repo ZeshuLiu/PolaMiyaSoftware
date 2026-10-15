@@ -126,9 +126,7 @@ static esp_err_t wait_until_ready(void)
         if (esp_timer_get_time() - started_us >= EEPROM_WRITE_TIMEOUT_MS * 1000) {
             return ESP_ERR_TIMEOUT;
         }
-        /* At 100 Hz, a 1 ms delay rounds to zero. Wait at least one tick. */
-        const TickType_t delay = pdMS_TO_TICKS(1);
-        vTaskDelay(delay ? delay : 1);
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 }
 

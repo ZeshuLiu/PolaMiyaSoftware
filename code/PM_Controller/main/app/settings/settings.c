@@ -36,11 +36,8 @@ static esp_err_t load_records(void)
             return result;
         }
         uint32_t sequence;
-        if (!settings_record_valid(record, &sequence)) {
-            continue;
-        }
         settings_values_t values;
-        result = settings_record_decode(record, &values);
+        result = settings_record_decode(record, &values, &sequence);
         if (result != ESP_OK && result != ESP_ERR_NOT_SUPPORTED) {
             continue;
         }
@@ -150,48 +147,38 @@ esp_err_t settings_increment(settings_key_t key, uint64_t amount)
     return result;
 }
 
+/* Callers pass at most one record; reuse this readback for each commit stage. */
+static esp_err_t write_verified(uint32_t address, const uint8_t *data, size_t length)
+{
+    uint8_t verify[SETTINGS_RECORD_BYTES];
+    esp_err_t result = eeprom_write(address, data, length);
+    if (result != ESP_OK) {
+        return result;
+    }
+    result = eeprom_read(address, verify, length);
+    if (result != ESP_OK) {
+        return result;
+    }
+    return memcmp(verify, data, length) == 0 ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
+}
+
 static esp_err_t write_record(unsigned int index, const uint8_t *record)
 {
     const uint32_t address = FIRST_RECORD_ADDRESS + index * SETTINGS_RECORD_BYTES;
     const uint8_t invalid_marker[SETTINGS_COMMIT_BYTES] = {0};
-    uint8_t verify[SETTINGS_RECORD_BYTES];
-    esp_err_t result = eeprom_write(address + SETTINGS_COMMIT_OFFSET,
-                                    invalid_marker, sizeof(invalid_marker));
+    esp_err_t result = write_verified(address + SETTINGS_COMMIT_OFFSET,
+                                      invalid_marker, sizeof(invalid_marker));
     if (result != ESP_OK) {
         return result;
     }
-    result = eeprom_read(address + SETTINGS_COMMIT_OFFSET, verify, sizeof(invalid_marker));
+    result = write_verified(address, record, settings_record_body_size(record));
     if (result != ESP_OK) {
         return result;
-    }
-    if (memcmp(verify, invalid_marker, sizeof(invalid_marker)) != 0) {
-        return ESP_ERR_INVALID_RESPONSE;
-    }
-    const size_t body_size = settings_record_body_size(record);
-    result = eeprom_write(address, record, body_size);
-    if (result != ESP_OK) {
-        return result;
-    }
-    result = eeprom_read(address, verify, body_size);
-    if (result != ESP_OK) {
-        return result;
-    }
-    if (memcmp(verify, record, body_size) != 0) {
-        return ESP_ERR_INVALID_RESPONSE;
     }
     /* The last marker uses its own physical page, leaving the previous
      * committed record intact throughout an interrupted save. */
-    result = eeprom_write(address + SETTINGS_COMMIT_OFFSET,
+    return write_verified(address + SETTINGS_COMMIT_OFFSET,
                           record + SETTINGS_COMMIT_OFFSET, SETTINGS_COMMIT_BYTES);
-    if (result != ESP_OK) {
-        return result;
-    }
-    result = eeprom_read(address + SETTINGS_COMMIT_OFFSET, verify, SETTINGS_COMMIT_BYTES);
-    if (result != ESP_OK) {
-        return result;
-    }
-    return memcmp(verify, record + SETTINGS_COMMIT_OFFSET, SETTINGS_COMMIT_BYTES) == 0
-        ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
 }
 
 esp_err_t settings_commit(void)
@@ -206,10 +193,8 @@ esp_err_t settings_commit(void)
         const unsigned int next = store.active_record < 0 ? 0
             : ((unsigned int)store.active_record + 1) % RECORD_COUNT;
         const uint32_t sequence = store.status.sequence + 1;
-        result = settings_record_encode(&store.values, sequence, record);
-        if (result == ESP_OK) {
-            result = write_record(next, record);
-        }
+        settings_record_encode(&store.values, sequence, record);
+        result = write_record(next, record);
         if (result == ESP_OK) {
             store.active_record = (int)next;
             store.status.sequence = sequence;

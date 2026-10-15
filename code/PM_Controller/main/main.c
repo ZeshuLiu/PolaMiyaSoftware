@@ -4,12 +4,24 @@
 #include "lcd_test.h"
 #include "lcd_st7789.h"
 #include "settings.h"
+#include "shutter.h"
+#include "sdm50.h"
 #include "esp_log.h"
 
 void app_main(void)
 {
     ESP_ERROR_CHECK(flash_trigger_init());
+    shutter_init();
     hc165_init();
+
+    esp_err_t range_result = sdm50_init();
+    if (range_result == ESP_OK) {
+        range_result = sdm50_start();
+    }
+    if (range_result != ESP_OK) {
+        ESP_LOGW("main", "SDM50 initialization/start failed: %s",
+                 esp_err_to_name(range_result));
+    }
 
     const esp_err_t storage_result = settings_init();
     if (storage_result != ESP_OK) {
