@@ -5,16 +5,18 @@
 #include "driver/spi_master.h"
 #include "esp_attr.h"
 #include "esp_err.h"
+#include "esp_log.h"
 #include "esp_rom_sys.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 #define HC165_SCAN_INTERVAL_MS 5
-#define HC165_TASK_STACK_BYTES 2048
+#define HC165_TASK_STACK_BYTES 4096
 #define HC165_TASK_PRIORITY 3
 #define HC165_SPI_CLOCK_HZ 500000
 
+static const char *TAG = "hc165";
 static spi_device_handle_t spi;
 /* Internal, word-aligned DMA storage; only one byte is clocked in.
  * Startup reads finish before the scan task takes ownership. */
@@ -65,8 +67,27 @@ static void scan_once(void)
 {
     const uint8_t raw = read_parallel_inputs();
     const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    const uint8_t previous_pressed = hc165_keys_pressed(&keys);
     const hc165_key_events_t events = hc165_keys_update(&keys, raw, now_ms);
     publish_inputs(raw, events);
+
+    const uint8_t pressed = hc165_keys_pressed(&keys);
+    const uint8_t changed = previous_pressed ^ pressed;
+    /* Log confirmed transitions outside the state lock; leave events for consumers. */
+    for (unsigned int i = 0; i < HC165_KEY_COUNT; ++i) {
+        const uint8_t mask = (uint8_t)(1U << i);
+        if (changed & mask) {
+            ESP_LOGI(TAG, "KEY%u %s, raw=0x%02X pressed=0x%02X", i + 1,
+                     (pressed & mask) ? "pressed" : "released",
+                     (unsigned int)raw, (unsigned int)pressed);
+        }
+        if (events.short_press & mask) {
+            ESP_LOGI(TAG, "KEY%u short press", i + 1);
+        }
+        if (events.long_press & mask) {
+            ESP_LOGI(TAG, "KEY%u long press", i + 1);
+        }
+    }
 }
 
 static void scan_inputs(void *argument)
