@@ -36,4 +36,4 @@ Rev1.3 实际主控为 STM32G474RE，固件配置与其一致；硬件文件仍�
 
 本目录用于查询旧实现、维修旧设备及必要的历史修复。第二代开发在 [code/PM_Controller](../../code/PM_Controller/) 进行。旧算法或界面资源可经适配移植，不直接搬用 STM32 启动代码、HAL、时钟和引脚配置。
 
-GUI Guider 资源继续保留在 [GuiGuider/MainControl](../../GuiGuider/MainControl/)，尚未确认其与第二代固件的兼容性。
+GUI Guider 资源继续保留在 [UI设计/MainControl](../../UI设计/MainControl/)，尚未确认其与第二代固件的兼容性。

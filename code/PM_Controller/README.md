@@ -1,8 +1,10 @@
 # PM_Controller 固件
 
+2026-10-18：用户确认当前竖屏 UI、三键映射和 ADC 接入版本“测试 OK”，据此保存本地 Git 版本。本轮未代为构建、测试或烧录；ADC 实际采样率、计量精度和其它专项指标未提供量化记录。具体按键功能统一在 [ui.c 的 handle_keys()](main/app/ui/ui.c) 中实现，扫描识别与图标显示分别由 HC165 驱动和 UI 视图负责。
+
 对应 PCB：PM_Controller Rev2.x，当前为 Rev2.0。模组：ESP32-S3-WROOM-1-N8R8，8 MB Flash、8 MB Octal PSRAM。开发环境为 ESP-IDF 6.1。当前 FreeRTOS tick 为 1 kHz（`CONFIG_FREERTOS_HZ=1000`）；按键扫描目标周期 5 ms，EEPROM 忙等待延时为 1 tick。消抖、长按、LVGL 定时与 GPTimer 目标脉宽仍按各自的时间单位配置。
 
-`app_main()` 将闪光输出初始化为低电平，接入 GPIO42 快门下降沿中断，启动 74HC165 按键扫描，加载 24C64 参数，初始化官方 ST7789 驱动和 LVGL，并启动屏幕方向与偏移测试。按键消抖确认后打印 KEY1–KEY6 的按下、松开及长短按日志；事件供外部读取，尚未接入 LVGL 菜单。参数修改与持久化提交分开。引脚和双 OTA 分区已整理，电机、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
+`app_main()` 将闪光输出初始化为低电平，接入 GPIO42 快门下降沿中断，启动 74HC165 按键扫描，加载 24C64 参数，初始化官方 ST7789 驱动和 LVGL，并启动三页竖屏 UI。KEY1–KEY3 用于页面导航、背光调节和显式保存；KEY4–KEY6 暂未接入业务。主程序每 1 s 打印测距及 ADC/电源快照。参数修改与持久化提交分开。引脚和双 OTA 分区已整理，电机、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
 
 2026-10-07：按用户要求移除本地主机测试、桩及测试缓存，保留固件内的屏幕方向与偏移测试。下文主机测试结果为清理前的验证记录。
 
@@ -26,14 +28,20 @@
 | [main/drivers/eeprom/](main/drivers/eeprom/README.md) | 官方 I²C、24C64 分页读写及写完成轮询 |
 | [main/drivers/flash_trigger/](main/drivers/flash_trigger/README.md) | GPIO 直接触发、GPTimer 中断结束、忙状态及默认低电平 |
 | [main/drivers/sdm50/](main/drivers/sdm50/README.md) | UART1/UHCI DMA 测距、中断更新结果和启停应答 |
+| [main/drivers/adc_measure/](main/drivers/adc_measure/README.md) | ADC1 最低速连续 DMA、两路校准与滤波快照 |
 | [main/app/shutter/](main/app/shutter/) | GPIO42 快门下降沿 ISR 直接触发闪光 |
 | [main/app/settings/](main/app/settings/README.md) | 参数定义、RAM 缓存、CRC、轮换保存与旧版导入 |
 | [main/app/display/](main/app/display/) | 官方 esp_lvgl_port 初始化和显示配置 |
+| [main/app/ui/](main/app/ui/README.md) | CASE 7 竖屏 UI、测距曲线、KEY1–3 菜单及背光设置 |
+| [main/app/focus_distance/](main/app/focus_distance/README.md) | 对焦物距获取接口；当前借用实测距离，等待 FocusUnit 通信和位置标定 |
+| [main/app/power_monitor/](main/app/power_monitor/README.md) | 电池电压、单节锂电池电量估算和 IPROPI 电流换算 |
 | [main/app/lcd_test/](main/app/lcd_test/) | LVGL 测试控件和定时切换 |
 | [main/idf_component.yml](main/idf_component.yml) | 固定官方移植组件和 LVGL 版本 |
 | [partitions.csv](partitions.csv) | 8 MB Flash 自定义分区表 |
 | CMakeLists.txt、main/CMakeLists.txt | ESP-IDF 构建配置 |
 | sdkconfig | 本机配置，当前不纳入 Git；sdkconfig.defaults 后续再整理 |
+
+测距边界显示：合法返回值小于 50 mm 时实测显示 NEAR，下指针停在零端点；NO_TARGET（50000 及以上返回值）按约定显示 INF，指针移到无穷远。20～49.999 m 仍显示真实数值，只把指针限在 20 m。过期与通信错误仍显示短横线；FocusUnit 接口不增加 NEAR 状态。主屏移除距离状态文字行，BAT 改为电池图标，电量数据不可用时显示 `?`。此次改动未编译、未上板验证。
 
 ## 引脚
 
@@ -83,38 +91,42 @@
 
 ## 显示屏
 
+2026-10-18：右侧按上 KEY3、中 KEY2、下 KEY1 显示图标，随浏览/编辑切换；16 px 提示区和淡化渐变背景代替文字按键提示，顶部区域收至 30 px，电池主体 19×10 px。按键统一为 KEY3 上/右/增加、KEY1 下/左/减少、KEY2 确认/执行；图标高度为示意位置，字体、渐变与实物对齐待用户上板确认，本轮未编译、未测试、未烧录。
+
+ADC 已接入：GPIO3 电池电压、GPIO8 电机 IPROPI，使用官方连续 DMA 和 curve-fitting 校准，按 SDK 最低总采样率 611 Hz、两路交替约各 305.5 Hz；每路 31 样本生成约 100 ms 快照。主屏图标与 INFO 电压/估算电量、电机 mA/IPROPI mV 已接实际 ADC 快照；百分比按用户确认的单节 4.2 V 锂电池通用电压节点估算，未做电芯标定。未实现低压关机、过流或堵转保护。初始化失败时保留界面并显示未知。实现及误差边界见 [电源读数](main/app/power_monitor/README.md)，本轮未编译、未测试、未烧录。
+
 - 驱动芯片：ST7789。
 - 屏幕原始尺寸：长 320、高 172 像素。
 - 安装与显示方向：竖屏，显示坐标按宽 172、高 320 像素使用。
 - 接口：SPI，使用 PIN.h 中的 LCD_MOSI、LCD_CLK、LCD_CS、LCD_DC、LCD_RES 和 LCD_BLK 引脚。
-- 背光低电平点亮。旋转方向和显示窗口偏移待接屏后确认。
+- 背光低电平点亮，使用 LEDC 低速 Timer 0 / Channel 0、20 kHz、10 bit PWM。开启时约 300 ms 渐亮至设置亮度，关闭时停止渐变并立即熄灭；UI 切页不重新渐亮。设置页修改 RAM 亮度并立即应用，长按 KEY2 保存。显示方向与窗口固定为 CASE 7（ROT 180、X34/Y0）。本次背光百分比接入未上板验证。
 
 ### LVGL 接入
 
 依赖固定为 `espressif/esp_lvgl_port 2.9.0` 和 `lvgl/lvgl 9.3.0`，与本机 ESP-IDF SPI 屏幕示例及 GUI Guider 的 LVGL 主次版本一致。组件管理器在配置工程时下载依赖，不复制旧工程的 LVGL 源码。
 
-调用顺序：`app_main()` → `flash_trigger_init()` → `shutter_init()` → `hc165_init()` → `sdm50_init()` / `sdm50_start()` → `settings_init()` → `lcd_st7789_init()` → `display_init()` → `lcd_test_start()`。闪光输出、按键和显示初始化失败通过 `ESP_ERROR_CHECK` 停止启动；测距初始化或开启失败、参数存储失败记录警告并继续显示启动。参数锁成功分配后，器件错误时仍可使用 RAM 默认值，持久化提交被禁止。初始化接口只在开机时调用一次；显示和测试定时器持续运行，不提供运行中销毁或重复初始化接口。
+调用顺序：`app_main()` → `flash_trigger_init()` → `shutter_init()` → `hc165_init()` → `sdm50_init()` / `sdm50_start()` → `settings_init()` → `adc_measure_init()` → `lcd_st7789_init()` → `display_init()` → `ui_start()`。闪光输出、按键和显示初始化失败通过 `ESP_ERROR_CHECK` 停止启动；测距初始化或开启失败、参数存储失败、ADC 初始化失败记录警告并继续显示启动。参数锁成功分配后，器件错误时仍可使用 RAM 默认值，持久化提交被禁止。初始化接口只在开机时调用一次，不提供运行中销毁或重复初始化接口。
 
-使用 ESP-IDF 官方 `esp_lcd_new_panel_st7789()`，SPI2、模式 0、20 MHz、RGB565。板级文件只配置引脚、SPI 和背光，直接输出官方 `panel`、`io` 句柄。LVGL 任务、时钟、刷新、字节交换、DMA 完成回调和硬件旋转由官方移植组件管理。
+使用 ESP-IDF 官方 `esp_lcd_new_panel_st7789()`，SPI2、模式 0、40 MHz、RGB565。板级文件只配置引脚、SPI 和背光，直接输出官方 `panel`、`io` 句柄。LVGL 任务、时钟、刷新、字节交换、DMA 完成回调和硬件旋转由官方移植组件管理。
 
-LVGL 使用两个内部 DMA 绘图缓冲区，每个 5,120 像素、10,240 字节，SPI 最大传输长度与之匹配。使用局部刷新；PSRAM 已在本机配置中启用，但本显示路径不依赖 PSRAM 绘图缓冲区。操作 LVGL 时使用 `lvgl_port_lock()` / `lvgl_port_unlock()`；LVGL 定时器回调已经处于该锁的保护下。
+LVGL 使用两个内部 DMA 绘图缓冲区，每个 172×64 像素、22,016 字节，共 44,032 字节（43 KiB），SPI 最大传输长度使用同一宏。buff_dma=true、buff_spiram=false，不启用 psram_dma_direct。使用局部刷新，帧率测试主动触发整屏刷新。操作 LVGL 时使用 lvgl_port_lock()/lvgl_port_unlock()；定时器回调已经持锁。
 
-### 方向与偏移测试
+### 帧率与圆角测试
 
-上电循环显示 12 组画面，每组保持 6 秒：ROT 0、90、180、270，各测试短边偏移 34、0、68 像素。首组为 ROT 0、X34、Y0；34 是按 240 像素控制器短边居中裁出 172 像素的候选值，尚未实测确认。
+2026-10-17：启动入口已改为 [三页业务 UI](main/app/ui/README.md)，方向/偏移和完整显存清屏移至 `display_init()`；正式 UI 使用默认 LVGL 刷新定时器。以下屏幕测试源码仍保留，默认不启动，不与业务 UI 同时运行。新界面未编译、未测试、未烧录。
 
-网格、边框、角标、文字、箭头和 RGB 色条全部使用 LVGL 对象绘制，切换由 LVGL 定时器执行。ROT 使用 LVGL 的旋转定义；原测试中手动设置的 90/270 镜像组合与官方移植层不同，应按当前画面重新确认方向。
+用户已确认 CASE 1、4、7、10 的方向/偏移正确。当前固定 CASE 7：ROT 180、172×320、X34/Y0；SPI 保持 40 MHz 和 DMA。
 
-- ROT 0 / 180：逻辑尺寸 172×320，调整 X 偏移。
-- ROT 90 / 270：逻辑尺寸 320×172，调整 Y 偏移。
-- 正确画面应四边完整，TL/TR/BL/BR 分别位于左上、右上、左下、右下，TOP 与 UP 箭头朝上，文字正向。
-- 底部 R/G/B 色条应依次为红、绿、蓝。若红蓝互换，调整 [lcd_st7789.h](main/drivers/st7789/lcd_st7789.h) 中的 `LCD_ST7789_BGR`；若颜色反相，调整 `LCD_ST7789_INVERT_COLORS`。
+测试每 10 秒交替显示两页，启动先显示帧率页：
 
-画面和串口都会给出 CASE 编号、ROT、X/Y 偏移。确认后，在 [lcd_test.c](main/app/lcd_test/lcd_test.c) 中设置 `LCD_TEST_ROTATION_INDEX`、`LCD_TEST_GAP_INDEX`，并将 `LCD_TEST_AUTO_CYCLE` 改为 0 固定显示。偏移索引 0/1/2 分别对应 34/0/68。
+- 帧率页：红绿蓝背景上两条高对比移动条，显示帧号、FPS、平均帧间隔 AVG 和最大帧间隔 MAX。移动按实际时间计算。每帧强制刷新完整 172×320，调用 `lv_refr_now()` 后等待最后一批 SPI DMA 完成，再计为一帧；每约 1 秒更新屏幕统计并输出串口日志。
+- 圆角页：显示距边缘 0/4/8/12/16 像素的白/红/黄/绿/青色矩形边框，四角 TL/TR/BL/BR 标记，以及品红色 R24 候选圆角边框。R24 只用于观察，不代表已测得屏幕圆角半径。对照可见边框选择内容安全边距。
 
-切换时关闭背光，将 LVGL 分辨率临时设为控制器 RAM 的 240×320，刷新黑色背景，再恢复 172×320 和候选偏移，绘制新画面。每次同步刷新后调用官方 SPI IO 的 `esp_lcd_panel_io_tx_param(io, -1, NULL, 0)`，等待最后一批 DMA 完成，不发送屏幕命令；完成后才改变窗口或打开背光，避免旧窗口残影影响偏移判断。
+FPS 为这套全屏画面的主控绘制、传输及调度综合吞吐，不是面板扫描频率，也不是小区域更新帧率。统计按相邻完整传输完成时间计算；切页构建和首帧不计入，返回帧率页时重新统计。圆角页静态显示，不计 FPS。
 
-RGB565 一帧为 110,080 字节。20 MHz SPI 的纯像素传输理论耗时约 44 ms，不含 LVGL 绘图、命令和调度。全 RAM 清屏只用于偏移测试；业务界面可直接操作 LVGL 控件并局部刷新。74HC165 已独立扫描，测试画面尚未使用按键；触摸、蓝牙、Wi-Fi 和 GUI Guider 业务界面尚未接入。
+排查程序接管刷新调度，暂停默认刷新定时器，并在手动刷新及更新统计后再次暂停（LVGL 的失效请求会恢复它）；使用 1 ms LVGL 定时器驱动页面，不额外替换官方 DMA 完成回调。仅在启动时清空 240×320 显存和开启背光，页面切换不重新渐亮。业务界面接入时应移除此专用调度或恢复默认刷新定时器。
+
+本轮按用户要求未编译、未烧录，帧率数值和圆角显示效果待实机确认；现有 build 固件不包含此次页面修改。
 
 ### 当前验证状态
 
@@ -122,7 +134,7 @@ PCB、PIN.h 和文档中的 29 个 GPIO 对应一致；分区表已通过 ESP-ID
 
 2026-10-07：4 个应用源文件、官方移植层的 LVGL 任务和显示源文件，以及固定 ROT 270 / GAP 68 的测试变体，使用本机 ESP-IDF 6.1 交叉编译器、官方发布头文件和 LVGL Kconfig 默认值通过 `-fsyntax-only` 检查。文档链接和 `git diff --check` 通过。Astra（中）对照实际组件源码完成只读审查，未发现可证实的 P1/P2 缺陷。
 
-本次未运行完整固件构建，未修改本机 sdkconfig，未创建 sdkconfig.defaults。旋转、偏移、颜色和 SPI 时钟稳定性尚未接屏验证，以实机测试为准。
+本次未运行完整固件构建，未修改本机 sdkconfig，未创建 sdkconfig.defaults。以上为历史验证范围。2026-10-17 用户已确认 CASE 1/4/7/10，选定 CASE 7；新设 40 MHz 的稳定性尚待上板确认。
 
 2026-10-07：74HC165 驱动、按键识别逻辑及应用入口通过 ESP-IDF 6.1 交叉编译器语法检查。14 项主机测试执行实际 C 驱动，覆盖全部 256 种输入位序、消抖、1 s 边界、多键操作、事件保持与清除、启动时按住、充电输入隔离和时间戳回绕。真实 RTOS 调度、电气时序和按键手感尚未接板验证。
 
@@ -167,5 +179,9 @@ idf.py -p COM端口 flash monitor
 
 - [第一代主控归档](../../archive/PM_Controller_Rev1_x/)：旧 STM32 固件，不适用于本 PCB。
 - [FocusUnit](../FocusUnit/)：独立对焦组件。
-- [GUI Guider](../../GuiGuider/MainControl/)：旧界面资源，移植前需适配。
+- [GUI Guider](../../UI设计/MainControl/)：旧界面资源，移植前需适配。
 - [软件与 PCB 兼容性表](../../软件与PCB兼容性表.md)。
+
+屏幕 SPI 上限依据：ST7789V3 V0.1，第 38 页四线串行接口写周期最小 16 ns，即 62.5 MHz。ESP32-S3 当前 80 MHz APB 分频最高合规档为 40 MHz；不能直接填 62.5 MHz（当前 IDF 会选成 80 MHz）。CS 建立和保持各设置 1 个 SPI 周期，即 25 ns，满足手册各 15 ns 要求。
+
+缓冲对比：用户实测内部 RAM 64 行双缓冲为 23.5 FPS、平均 42.5 ms、最大 43.5 ms；整屏内部 RAM 版本 buf2 分配失败；整屏 PSRAM 版本为 19.3 FPS、平均 51.7 ms、最大 55.3 ms。当前恢复内部 RAM 64 行双缓冲，本轮未编译、未烧录。

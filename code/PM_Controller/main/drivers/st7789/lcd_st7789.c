@@ -2,19 +2,59 @@
 
 #include "PIN.h"
 #include "driver/gpio.h"
+#include "driver/ledc.h"
 #include "driver/spi_master.h"
 #include "esp_err.h"
 #include "esp_lcd_panel_st7789.h"
 
+#define BACKLIGHT_MODE       LEDC_LOW_SPEED_MODE
+#define BACKLIGHT_TIMER      LEDC_TIMER_0
+#define BACKLIGHT_CHANNEL    LEDC_CHANNEL_0
+#define BACKLIGHT_OFF_DUTY   (1U << 10)
+
+static bool backlight_ready;
+static bool backlight_on;
+static unsigned backlight_percent = 100;
+
+static unsigned backlight_duty(void)
+{
+    return BACKLIGHT_OFF_DUTY * (100 - backlight_percent) / 100;
+}
+
+void lcd_st7789_set_brightness(unsigned percent)
+{
+    if (percent > 100) percent = 100;
+    backlight_percent = percent;
+    if (backlight_ready && backlight_on) {
+        ESP_ERROR_CHECK(ledc_fade_stop(BACKLIGHT_MODE, BACKLIGHT_CHANNEL));
+        ESP_ERROR_CHECK(ledc_set_duty_and_update(
+            BACKLIGHT_MODE, BACKLIGHT_CHANNEL, backlight_duty(), 0));
+    }
+}
+
 void lcd_st7789_backlight(bool on)
 {
-    gpio_set_level(PIN_LCD_BLK, on ? 0 : 1);
+    if (!backlight_ready || on == backlight_on) {
+        return;
+    }
+    ESP_ERROR_CHECK(ledc_fade_stop(BACKLIGHT_MODE, BACKLIGHT_CHANNEL));
+    if (on) {
+        /* Active-low: fade from constant high (off) to the configured brightness.
+         * Hardware fading runs without blocking the LVGL task. */
+        ESP_ERROR_CHECK(ledc_set_fade_time_and_start(
+            BACKLIGHT_MODE, BACKLIGHT_CHANNEL, backlight_duty(),
+            LCD_ST7789_BACKLIGHT_FADE_MS, LEDC_FADE_NO_WAIT));
+    } else {
+        ESP_ERROR_CHECK(ledc_set_duty_and_update(
+            BACKLIGHT_MODE, BACKLIGHT_CHANNEL, BACKLIGHT_OFF_DUTY, 0));
+    }
+    backlight_on = on;
 }
 
 void lcd_st7789_init(lcd_st7789_t *lcd)
 {
     /* Preload the output latch before enabling the active-low backlight. */
-    lcd_st7789_backlight(false);
+    ESP_ERROR_CHECK(gpio_set_level(PIN_LCD_BLK, 1));
     const gpio_config_t backlight_config = {
         .pin_bit_mask = 1ULL << PIN_LCD_BLK,
         .mode = GPIO_MODE_OUTPUT,
@@ -23,6 +63,27 @@ void lcd_st7789_init(lcd_st7789_t *lcd)
         .intr_type = GPIO_INTR_DISABLE,
     };
     ESP_ERROR_CHECK(gpio_config(&backlight_config));
+
+    const ledc_timer_config_t backlight_timer = {
+        .speed_mode = BACKLIGHT_MODE,
+        .duty_resolution = LEDC_TIMER_10_BIT,
+        .timer_num = BACKLIGHT_TIMER,
+        .freq_hz = LCD_ST7789_BACKLIGHT_PWM_HZ,
+        .clk_cfg = LEDC_AUTO_CLK,
+    };
+    ESP_ERROR_CHECK(ledc_timer_config(&backlight_timer));
+    const ledc_channel_config_t backlight_channel = {
+        .gpio_num = PIN_LCD_BLK,
+        .speed_mode = BACKLIGHT_MODE,
+        .channel = BACKLIGHT_CHANNEL,
+        .intr_type = LEDC_INTR_DISABLE,
+        .timer_sel = BACKLIGHT_TIMER,
+        .duty = BACKLIGHT_OFF_DUTY,
+        .hpoint = 0,
+    };
+    ESP_ERROR_CHECK(ledc_channel_config(&backlight_channel));
+    ESP_ERROR_CHECK(ledc_fade_func_install(0));
+    backlight_ready = true;
 
     const spi_bus_config_t bus_config = {
         .mosi_io_num = PIN_LCD_MOSI,
@@ -42,6 +103,9 @@ void lcd_st7789_init(lcd_st7789_t *lcd)
         .trans_queue_depth = 2,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
+        /* One 40 MHz cycle (25 ns) exceeds the panel's 15 ns CS setup/hold. */
+        .cs_ena_pretrans = 1,
+        .cs_ena_posttrans = 1,
         /* esp_lvgl_port registers the transfer-completion callback. */
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(SPI2_HOST, &io_config, &lcd->io));

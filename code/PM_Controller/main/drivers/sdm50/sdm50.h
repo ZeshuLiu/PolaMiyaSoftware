@@ -12,6 +12,7 @@ typedef enum {
     SDM50_STALE,
     SDM50_STOPPED,
     SDM50_RX_ERROR,
+    SDM50_TOO_CLOSE,           /* 合法帧中的距离小于 50 mm。 */
 } sdm50_status_t;
 
 typedef struct {

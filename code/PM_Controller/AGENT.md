@@ -40,7 +40,7 @@
 
 ```text
 flash_trigger_init → shutter_init → hc165_init → sdm50_init / sdm50_start → settings_init
-→ lcd_st7789_init → display_init → lcd_test_start
+→ adc_measure_init → lcd_st7789_init → display_init → ui_start
 ```
 
 闪光、按键和显示初始化失败停止启动。参数存储失败记录错误并继续显示启动；参数锁成功分配后，器件错误时仍可使用 RAM 默认值，持久化提交被禁止。
@@ -49,9 +49,13 @@ flash_trigger_init → shutter_init → hc165_init → sdm50_init / sdm50_start 
 
 | 模块 | 位置 / 接口 | 约束 |
 | --- | --- | --- |
-| 屏幕板级初始化 | [drivers/st7789](main/drivers/st7789/)；`lcd_st7789_init()` | 官方 ST7789 驱动，SPI2、20 MHz、RGB565；只负责初始化、句柄和背光 |
-| LVGL 接入 | [app/display](main/app/display/)；`display_init()` | 官方移植层管理任务、时钟、双缓冲、刷新、字节交换及旋转；不要另外注册 DMA 完成回调 |
-| 屏幕测试 | [app/lcd_test](main/app/lcd_test/)；`lcd_test_start()` | 全部用 LVGL 对象绘制；12 组方向 / 偏移；业务界面尚未接入 |
+| 屏幕板级初始化 | [drivers/st7789](main/drivers/st7789/)；`lcd_st7789_init()` | 官方 ST7789 驱动，SPI2、40 MHz、RGB565；只负责初始化、句柄和背光 |
+| LVGL 接入 | [app/display](main/app/display/)；`display_init()` | 官方移植层管理任务、时钟、双缓冲、刷新、字节交换及旋转；CASE 7、完整 RAM 清屏及 gap=(34,0) 在此配置；不要另外注册 DMA 完成回调 |
+| 竖屏 UI | [app/ui](main/app/ui/README.md)；`ui_start()` | 默认启动三页界面；只使用 KEY1–3，KEY4–6 暂未接线；UI 为 HC165 事件唯一消费者，EEPROM 保存不得持有 LVGL 锁 |
+| 对焦物距 | [app/focus_distance](main/app/focus_distance/README.md)；`focus_distance_get()` | 当前借用实测距离，内部以 using_actual 标记占位来源，屏幕不显示状态行；后续接 FocusUnit 通信和位置标定，编码器计数不能直接当毫米；INF 独立状态 |
+| ADC 采样 | [drivers/adc_measure](main/drivers/adc_measure/README.md)；`adc_measure_init/get()` | ADC1 GPIO3/CH2、GPIO8/CH7；最低连续 DMA 总采样率 611 Hz，每路约 305.5 Hz、31 样本/窗口；校准和 IIR；禁止同时占用 ADC1 oneshot |
+| 电源显示 | [app/power_monitor](main/app/power_monitor/README.md)；`power_monitor_get()` | 用户确认单节 4.2 V 锂电池；电压乘 2、通用节点估算电量；IPROPI 按 R2=1 kΩ、1575 µA/A 换算；未实现低压/过流/堵转保护 |
+| 屏幕测试 | [app/lcd_test](main/app/lcd_test/)；`lcd_test_start()` | CASE 7 帧率与圆角排查源码保留，默认不启动；不得与 UI 同时运行 |
 | 按键 | [drivers/hc165](main/drivers/hc165/README.md)；`hc165_get_events()`、`hc165_take_events()` | 6 键独立消抖和长短按，两组事件掩码保持到读取并清除 |
 | EEPROM | [drivers/eeprom](main/drivers/eeprom/README.md)；`eeprom_read()`、`eeprom_write()` | 用户已确认 24C64；官方 I²C、分页、ACK 轮询、错误返回及访问互斥 |
 | 参数管理 | [app/settings](main/app/settings/README.md)；`settings_set()`、`settings_increment()`、`settings_commit()` | RAM 修改与保存分开，稳定 ID、小端编码、CRC 和轮换记录 |
@@ -59,11 +63,12 @@ flash_trigger_init → shutter_init → hc165_init → sdm50_init / sdm50_start 
 
 ### LVGL 与背光
 
-- 逻辑尺寸 172×320；旋转和偏移尚未接屏定型，34 像素是居中裁切候选值。
+- 逻辑尺寸 172×320；用户确认方向 7：LVGL ROT 180、gap=(34,0)。业务 UI 使用默认刷新定时器，`lcd_test` 保留但默认不启动。
+- 屏幕右侧实体键从上到下为 KEY3、KEY2、KEY1。后续 UI 统一沿用：KEY3=上/右/增加，KEY1=下/左/减少，KEY2=确认/执行。横向切页使用左右箭头，纵向菜单使用上下箭头；确认、编辑完成及保存均放在 KEY2，当前 SETUP 长按 KEY2 保存。不能将执行功能重新放到 KEY1/3。顶部区域 30 px、电池主体 19×10 px；提示区 16 px、提亮的细线图标和淡化渐隐背景，实际按键高度待测量。
 - LVGL 调用使用 `lvgl_port_lock()` / `lvgl_port_unlock()`；官方 LVGL 定时器回调已持有该锁。
-- 两个内部 DMA 缓冲区各 5,120 像素，SPI 最大传输长度与之匹配；不要直接改成 PSRAM DMA 缓冲而不核对平台限制。
+- 两个内部 DMA 缓冲区各 172×64 像素，SPI 最大传输长度与之匹配；不要直接改成 PSRAM DMA 缓冲而不核对平台限制。
 - 测试切换方向 / 偏移前通过 LVGL 清空整个 240×320 控制器 RAM；同步刷新后等待最后一批传输结束再改变窗口或点亮背光。
-- GPIO9 背光低电平点亮。开关已实现，PWM 和渐变尚未实现。
+- GPIO9 背光低电平点亮，LEDC 20 kHz / 10 bit；开启时约 300 ms 渐亮，百分比接口支持 0–100%。设置页 RAM 修改即时应用，长按 KEY2 显式提交。当前 UI 与百分比调节未上板验证。
 
 ### 74HC165
 
@@ -81,7 +86,7 @@ flash_trigger_init → shutter_init → hc165_init → sdm50_init / sdm50_start 
 - U12 已按用户确认的 24C64 实现：8 KB、32 字节页、双字节地址、器件地址 0x50；SCL=GPIO15、SDA=GPIO16，100 kHz，WP 接地。
 - 原理图仍使用 AT24CS16 符号。该旧符号不代表当前驱动应使用 AT24CS16 的单字节 / 块地址协议。
 - `settings_init()` 负责器件初始化与加载；启动只读，不自动格式化、递增计数或导入旧数据。
-- 当前参数为重启次数、快门次数、电机运行毫秒数及背光百分比；均为 uint64 字段。背光参数尚未应用到 PWM，校准字段尚未定义。
+- 当前参数为重启次数、快门次数、电机运行毫秒数及背光百分比；均为 uint64 字段。背光参数在 UI 启动时应用到 PWM，校准字段尚未定义。
 - 新参数在 `settings.h` 中增加稳定 ID 和 RAM 字段，并在 `settings_record.c` 的 `parameters[]` 增加默认值、范围及计数属性。已有 ID 不重排、不复用，不直接持久化 C 结构体。
 - `0x0000–0x00FF` 保留；`0x0100–0x1FFF` 为 31 个 256 字节记录，提交标记独占最后一个物理页。不要绕过参数服务改写该区域。
 - 写入先使目标标记失效，再写并校验内容，最后提交；未知版本 / 字段禁止覆盖。扫描失败禁止提交。
@@ -114,6 +119,8 @@ flash_trigger_init → shutter_init → hc165_init → sdm50_init / sdm50_start 
 - 未明确要求时不主动提交 Git 或推送。请求提交时，只暂存授权范围，并先更新受影响文档。
 
 ## 验证边界与后续工作
+
+- 2026-10-18 用户确认当前竖屏 UI、三键映射和 ADC 接入版本“测试 OK”；这份反馈不扩展为 ADC 精度、SPI/PWM 时序或故障边界的量化验收。本轮仅整理记录并提交，未代为编译、测试或烧录；既有“不要测试”限制继续适用。
 
 - LVGL 接入曾由 Astra（中）做源码审查，未发现可证实的 P1/P2 缺陷；该结论仅对应当时的 LVGL 改动，不代表整工程审查。
 - 按键 14 项、参数存储 25 项主机检查在停止测试指令之前完成，记录见各模块 README。新增闪光测试已移除；不自动恢复测试或语法检查。

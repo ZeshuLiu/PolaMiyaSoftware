@@ -7,11 +7,17 @@ idf_component_register(
         "drivers/eeprom/eeprom.c"
         "drivers/flash_trigger/flash_trigger.c"
         "drivers/sdm50/sdm50.c"
+        "drivers/adc_measure/adc_measure.c"
         "app/settings/settings.c"
         "app/shutter/shutter.c"
         "app/settings/settings_record.c"
         "app/display/display.c"
         "app/lcd_test/lcd_test.c"
+        "app/ui/ui.c"
+        "app/ui/ui_view.c"
+        "app/ui/ui_key_hints.c"
+        "app/focus_distance/focus_distance.c"
+        "app/power_monitor/power_monitor.c"
     INCLUDE_DIRS
         "."
         "drivers/st7789"
@@ -19,9 +25,13 @@ idf_component_register(
         "drivers/eeprom"
         "drivers/flash_trigger"
         "drivers/sdm50"
+        "drivers/adc_measure"
         "app/settings"
         "app/shutter"
         "app/display"
         "app/lcd_test"
-    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_timer freertos esp_rom
+        "app/ui"
+        "app/focus_distance"
+        "app/power_monitor"
+    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_ledc esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_adc esp_timer freertos esp_rom
 )

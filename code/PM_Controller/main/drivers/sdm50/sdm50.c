@@ -82,8 +82,8 @@ static void parse_byte(uint8_t byte, BaseType_t *woken)
             latest.distance_mm = distance;
             latest.timestamp_us = esp_timer_get_time();
             ++latest.sequence;
-            latest.status = distance >= 50 && distance < 50000
-                          ? SDM50_VALID : SDM50_NO_TARGET;
+            latest.status = distance < 50 ? SDM50_TOO_CLOSE :
+                            distance < 50000 ? SDM50_VALID : SDM50_NO_TARGET;
             portEXIT_CRITICAL_ISR(&sample_lock);
         } else if (frame[1] == 0x8a && frame[2] == 2 &&
                    frame[4] == 0 && (frame[3] == 0 || frame[3] == 2)) {
@@ -277,7 +277,8 @@ esp_err_t sdm50_get_sample(sdm50_sample_t *sample)
                             ? waiting_since_us : sample->timestamp_us;
     portEXIT_CRITICAL(&sample_lock);
     if ((sample->status == SDM50_WAITING || sample->status == SDM50_VALID ||
-         sample->status == SDM50_NO_TARGET) && esp_timer_get_time() - reference > STALE_US) {
+         sample->status == SDM50_NO_TARGET || sample->status == SDM50_TOO_CLOSE) &&
+        esp_timer_get_time() - reference > STALE_US) {
         sample->status = SDM50_STALE;
     }
     return ESP_OK;

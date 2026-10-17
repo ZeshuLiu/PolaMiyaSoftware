@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="624" viewBox="0 0 900 624">
+<style>text{font-family:'Segoe UI','Microsoft YaHei',sans-serif} .screen{fill:#080b0c;stroke:#41494b;stroke-width:1}.white{fill:#f1f5f4}.muted{fill:#9caeab}.accent{fill:#b1ffd3}.line{stroke:#303c39;stroke-width:1}.small{font-size:12px}.body{font-size:14px}.title{font-size:18px;fill:#162522}.caption{font-size:13px;fill:#52635e}</style>
+<rect width="900" height="624" fill="#edf1ee"/>
+<text x="34" y="34" class="title">PolaMiya · 172 × 320 · 方向 7 竖屏方案</text>
+<text x="34" y="58" class="caption">布局示意 / 数字为样例 / 主屏 → 信息 → 设置</text>
+<g transform="translate(38 104) scale(1.5)">
+<rect class="screen" width="172" height="320" rx="23"/>
+<text x="16" y="28" class="white body">PolaMiya</text>
+<rect x="126" y="16" width="27" height="16" rx="2" fill="none" stroke="#9caeab"/>
+<rect x="154" y="21" width="3" height="6" fill="#9caeab"/>
+<rect x="128" y="18" width="14" height="12" fill="#f1f5f4"/>
+<path class="line" d="M16 39H156"/>
+<text x="16" y="65" class="accent small">FOCUS</text><text x="96" y="65" fill="#72c9ff" class="small">ACTUAL</text>
+<text x="16" y="105" class="accent" font-size="22">2.50</text><text x="80" y="101" class="white body">/</text><text x="96" y="105" fill="#72c9ff" font-size="22">2.50</text>
+<path d="M16 150H124M131 150H135M141 150H145M16 147v7M41 147v7M55 147v7M80 147v7M101 147v7M124 147v7M152 147v7" stroke="#9caeab" stroke-width="1"/>
+<g class="small muted" text-anchor="middle"><text x="16" y="183">0</text><text x="41" y="183">1</text><text x="55" y="183">2</text><text x="80" y="183">5</text><text x="101" y="183">10</text><text x="124" y="183">20</text><text x="152" y="183">INF</text></g>
+<path d="M56 138H64L60 144Z" fill="none" stroke="#b1ffd3" stroke-width="2"/>
+<path d="M56 162H64L60 156Z" fill="none" stroke="#72c9ff" stroke-width="2"/>
+<text x="16" y="203" class="muted small">RANGE / 10s</text>
+<g class="line"><path d="M36 216H156M36 238H156M36 260H156"/></g>
+<g class="muted" font-size="9"><text x="15" y="219">3.0</text><text x="15" y="263">2.0</text><text x="36" y="274">-10s</text><text x="156" y="274" text-anchor="end">NOW</text></g>
+<path d="M37 247L43 246 49 249 55 240 61 241 67 234 73 237 79 229 85 232 91 235 97 231 103 232 109 237 115 234 121 239 127 235 133 239 139 238 145 238 155 238" fill="none" stroke="#b1ffd3" stroke-width="1.5"/>
+<text x="16" y="295" class="white small">UP 00:12:34</text><text x="86" y="312" text-anchor="middle" class="muted" font-size="10">1/3 HOME</text>
+</g>
+<g transform="translate(321 104) scale(1.5)">
+<rect class="screen" width="172" height="320" rx="23"/>
+<text x="16" y="28" class="white body">DEVICE INFO</text><path class="line" d="M16 39H156"/>
+<g class="muted small"><text x="16" y="65">BATTERY</text><text x="16" y="110">MOTOR / IPROPI</text><text x="16" y="156">REBOOTS / SHUTTER</text><text x="16" y="202">MOTOR TOTAL</text><text x="16" y="248">STORAGE</text></g>
+<g class="white body"><text x="16" y="86">3.80V / ~60%</text><text x="16" y="131">0 mA / 0 mV</text><text x="16" y="177">12 / 128</text><text x="16" y="223">03 h 24 m</text><text x="16" y="269" class="accent">EEPROM OK</text></g>
+<text x="86" y="312" text-anchor="middle" class="muted" font-size="10">2/3 INFO</text>
+</g>
+<g transform="translate(604 104) scale(1.5)">
+<rect class="screen" width="172" height="320" rx="23"/>
+<text x="16" y="28" class="white body">SETTINGS</text><path class="line" d="M16 39H156"/>
+<text x="16" y="67" class="muted small">BACKLIGHT</text><text x="16" y="108" class="white" font-size="32">80<tspan font-size="14"> %</tspan></text>
+<rect x="16" y="128" width="140" height="5" rx="2" fill="#303c39"/><rect x="16" y="128" width="112" height="5" rx="2" fill="#b1ffd3"/>
+<text x="16" y="160" class="muted small">UNSAVED</text>
+<rect x="16" y="189" width="140" height="34" rx="4" fill="#b1ffd3"/><text x="86" y="211" fill="#10281b" text-anchor="middle" class="body">SAVE</text>
+<text x="86" y="253" class="white body" text-anchor="middle">BACK</text>
+<text x="86" y="312" text-anchor="middle" class="muted" font-size="10">3/3 SETUP</text>
+</g>
+<text x="38" y="609" class="caption">实体按键导航；没有接入的数据使用 --；异常距离显示 --.-- 及原因。</text>
+</svg>

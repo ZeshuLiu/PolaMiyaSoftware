@@ -1,200 +1,211 @@
 #include "lcd_test.h"
 
+#include <stdint.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
+#include "esp_timer.h"
 
-/* Set AUTO_CYCLE to 0 to hold the selected case after identifying the screen. */
-#define LCD_TEST_AUTO_CYCLE     1
-#define LCD_TEST_ROTATION_INDEX 0   /* 0, 1, 2, 3 -> 0, 90, 180, 270 degrees */
-#define LCD_TEST_GAP_INDEX      0   /* 0, 1, 2 -> 34, 0, 68 pixels */
-#define LCD_TEST_HOLD_MS        6000
-
-#define BLACK  0x000000
-#define WHITE  0xFFFFFF
-#define RED    0xFF0000
-#define GREEN  0x00FF00
-#define BLUE   0x0000FF
-#define YELLOW 0xFFFF00
-#define GRID   0x202020
+#define PAGE_HOLD_US  (10LL * 1000 * 1000)
+#define REPORT_US     (1LL * 1000 * 1000)
+#define WIDTH         LCD_ST7789_SHORT_SIDE
+#define HEIGHT        LCD_ST7789_LONG_SIDE
 
 static const char *TAG = "lcd_test";
-static const int gaps[] = {34, 0, 68};
-static const lv_display_rotation_t rotations[] = {
-    LV_DISPLAY_ROTATION_0,
-    LV_DISPLAY_ROTATION_90,
-    LV_DISPLAY_ROTATION_180,
-    LV_DISPLAY_ROTATION_270,
-};
 
-/* This context outlives app_main(); timer callbacks run on the LVGL task. */
+/* All UI and statistics run on the LVGL task under the port's mutex. */
 static struct {
     lv_display_t *display;
     lcd_st7789_t lcd;
-    unsigned int rotation_index;
-    unsigned int gap_index;
+    lv_obj_t *screen;
+    lv_obj_t *stats;
+    lv_obj_t *frame_label;
+    lv_obj_t *vertical_bar;
+    lv_obj_t *horizontal_bar;
+    bool corners_page;
+    int64_t page_start_us;
+    int64_t report_start_us;
+    int64_t last_frame_us;
+    int64_t longest_interval_us;
+    uint32_t sample_frames;
+    uint32_t total_frames;
 } test;
 
-static lv_obj_t *rectangle(lv_obj_t *parent, int x, int y, int width, int height,
-                           uint32_t color)
+static lv_obj_t *box(int x, int y, int width, int height, uint32_t color)
 {
-    lv_obj_t *object = lv_obj_create(parent);
-    lv_obj_remove_style_all(object);
-    lv_obj_remove_flag(object, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_pos(object, x, y);
-    lv_obj_set_size(object, width, height);
-    lv_obj_set_style_bg_color(object, lv_color_hex(color), 0);
-    lv_obj_set_style_bg_opa(object, LV_OPA_COVER, 0);
-    return object;
+    lv_obj_t *obj = lv_obj_create(test.screen);
+    lv_obj_remove_style_all(obj);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_size(obj, width, height);
+    lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+    return obj;
 }
 
-static void outline(lv_obj_t *parent, int inset, int width, int height, uint32_t color)
+static lv_obj_t *text(int x, int y, const char *value, uint32_t color)
 {
-    lv_obj_t *object = rectangle(parent, inset, inset,
-                                 width - 2 * inset, height - 2 * inset, BLACK);
-    lv_obj_set_style_bg_opa(object, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_color(object, lv_color_hex(color), 0);
-    lv_obj_set_style_border_width(object, 1, 0);
+    lv_obj_t *obj = lv_label_create(test.screen);
+    lv_label_set_text(obj, value);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_style_text_color(obj, lv_color_hex(color), 0);
+    return obj;
 }
 
-static lv_obj_t *label(lv_obj_t *parent, int x, int y, const char *text, uint32_t color)
+static void border(int inset, int radius, uint32_t color)
 {
-    lv_obj_t *object = lv_label_create(parent);
-    lv_label_set_text(object, text);
-    lv_obj_set_pos(object, x, y);
-    lv_obj_set_style_text_color(object, lv_color_hex(color), 0);
-    return object;
-}
-
-static void draw_pattern(unsigned int case_number, int x_gap, int y_gap)
-{
-    lv_obj_t *screen = lv_display_get_screen_active(test.display);
-    const int width = lv_display_get_horizontal_resolution(test.display);
-    const int height = lv_display_get_vertical_resolution(test.display);
-
-    for (int x = 20; x < width; x += 20) {
-        rectangle(screen, x, 0, 1, height, GRID);
-    }
-    for (int y = 20; y < height; y += 20) {
-        rectangle(screen, 0, y, width, 1, GRID);
-    }
-    outline(screen, 0, width, height, WHITE);
-    outline(screen, 4, width, height, YELLOW);
-
-    rectangle(screen, 8, 8, 20, 20, RED);
-    rectangle(screen, width - 28, 8, 20, 20, GREEN);
-    rectangle(screen, 8, height - 28, 20, 20, BLUE);
-    rectangle(screen, width - 28, height - 28, 20, 20, WHITE);
-    label(screen, 10, 10, "TL", WHITE);
-    label(screen, width - 26, 10, "TR", BLACK);
-    label(screen, 10, height - 26, "BL", WHITE);
-    label(screen, width - 26, height - 26, "BR", BLACK);
-    lv_obj_t *top = label(screen, 0, 0, "TOP", WHITE);
-    lv_obj_align(top, LV_ALIGN_TOP_MID, 0, 10);
-
-    const int label_x = width > height ? 38 : 20;
-    rectangle(screen, label_x - 2, 38, 134, 72, BLACK);
-    lv_obj_t *details = label(screen, label_x, 40, "", WHITE);
-    lv_label_set_text_fmt(details, "CASE %u\nROT %u\nX%d Y%d\n%dx%d",
-                          case_number, test.rotation_index * 90, x_gap, y_gap, width, height);
-
-    const int arrow_x = width > height ? width - 64 : (width - 24) / 2;
-    const int arrow_y = height / 2 - 24;
-    /* LVGL keeps the point array by reference, so it has static storage. */
-    static const lv_point_precise_t arrow_points[] = {{0, 12}, {12, 0}, {24, 12}};
-    lv_obj_t *arrow = lv_line_create(screen);
-    lv_line_set_points(arrow, arrow_points, 3);
-    lv_obj_set_pos(arrow, arrow_x, arrow_y);
-    lv_obj_set_style_line_color(arrow, lv_color_hex(YELLOW), 0);
-    lv_obj_set_style_line_width(arrow, 3, 0);
-    rectangle(screen, arrow_x + 11, arrow_y + 2, 3, 34, YELLOW);
-    label(screen, arrow_x + 3, arrow_y + 38, "UP", YELLOW);
-
-    const int band_width = (width - 64) / 3;
-    const uint32_t colors[] = {RED, GREEN, BLUE};
-    const char *names[] = {"R", "G", "B"};
-    for (int i = 0; i < 3; ++i) {
-        const int left = 32 + i * band_width;
-        rectangle(screen, left, height - 42, band_width, 18, colors[i]);
-        label(screen, left + (band_width - 10) / 2, height - 41,
-              names[i], i == 1 ? BLACK : WHITE);
-    }
+    lv_obj_t *obj = box(inset, inset, WIDTH - 2 * inset, HEIGHT - 2 * inset, 0);
+    lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_color(obj, lv_color_hex(color), 0);
+    lv_obj_set_style_border_width(obj, 1, 0);
+    lv_obj_set_style_radius(obj, radius, 0);
 }
 
 static void refresh_and_wait(void)
 {
-    lv_obj_invalidate(lv_display_get_screen_active(test.display));
+    /* Force a complete frame: moving a small object alone only measures partial updates. */
+    lv_obj_invalidate(test.screen);
     lv_refr_now(test.display);
-    /* With command -1, the SPI IO only waits for queued DMA transfers.
-     * Drain the last strip before changing the view or lighting the backlight. */
+    /* Command -1 drains pending SPI transfers without sending a command.
+     * Count the frame only after the last DMA strip completes. Keep the port callback. */
     ESP_ERROR_CHECK(esp_lcd_panel_io_tx_param(test.lcd.io, -1, NULL, 0));
+    /* Invalidation resumes LVGL's refresh timer; keep this diagnostic in control. */
+    lv_timer_pause(lv_display_get_refr_timer(test.display));
 }
 
-static void show_case(void)
+static void draw_fps_page(void)
 {
-    lcd_st7789_backlight(false);
-    ESP_ERROR_CHECK(esp_lcd_panel_io_tx_param(test.lcd.io, -1, NULL, 0));
-
-    lv_obj_t *screen = lv_display_get_screen_active(test.display);
-    lv_obj_clean(screen);
-    lv_obj_remove_style_all(screen);
-    lv_obj_remove_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(screen, lv_color_hex(BLACK), 0);
-    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
-
-    lv_display_set_rotation(test.display, rotations[test.rotation_index]);
-    /* Clear the whole controller RAM through LVGL, including the hidden margins.
-     * Then restore the glass size and test the selected offset. */
-    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(test.lcd.panel, 0, 0));
-    lv_display_set_resolution(test.display, LCD_ST7789_RAM_WIDTH, LCD_ST7789_RAM_HEIGHT);
-    refresh_and_wait();
-    lv_display_set_resolution(test.display, LCD_ST7789_SHORT_SIDE, LCD_ST7789_LONG_SIDE);
-
-    const bool landscape = test.rotation_index % 2 != 0;
-    const int x_gap = landscape ? 0 : gaps[test.gap_index];
-    const int y_gap = landscape ? gaps[test.gap_index] : 0;
-    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(test.lcd.panel, x_gap, y_gap));
-
-    const unsigned int case_number = test.rotation_index * 3 + test.gap_index + 1;
-    draw_pattern(case_number, x_gap, y_gap);
-    refresh_and_wait();
-    lcd_st7789_backlight(true);
-    ESP_LOGI(TAG, "CASE %u: ROT=%u size=%ldx%ld gap=(%d,%d) BGR=%d INVERT=%d",
-             case_number, test.rotation_index * 90,
-             (long)lv_display_get_horizontal_resolution(test.display),
-             (long)lv_display_get_vertical_resolution(test.display), x_gap, y_gap,
-             LCD_ST7789_BGR, LCD_ST7789_INVERT_COLORS);
+    text(16, 16, "FULL FRAME FPS", 0xffffff);
+    test.stats = text(16, 42, "FPS --.-\nAVG --.- ms\nMAX --.- ms", 0xffff00);
+    test.frame_label = text(16, 104, "FRAME 0", 0xffffff);
+    box(16, 132, 46, 144, 0xb82020);
+    box(62, 132, 47, 144, 0x209830);
+    box(109, 132, 47, 144, 0x2048b8);
+    test.vertical_bar = box(16, 132, 6, 144, 0xffffff);
+    test.horizontal_bar = box(16, 132, 140, 4, 0xffff00);
+    text(16, 284, "40MHz / CASE 7", 0xffffff);
 }
 
-#if LCD_TEST_AUTO_CYCLE
-static void next_case(lv_timer_t *timer)
+static void draw_corners_page(void)
+{
+    /* Square outlines deliberately reach into the glass's clipped corners. */
+    const uint32_t colors[] = {0xffffff, 0xff4040, 0xffff00, 0x40ff60, 0x40cfff};
+    for (int i = 0; i < 5; ++i) {
+        border(i * 4, 0, colors[i]);
+    }
+    /* Candidate rounded outline, not an assumed physical glass radius. */
+    border(2, 24, 0xff40ff);
+    text(20, 22, "TL", 0xffffff);
+    text(132, 22, "TR", 0xffffff);
+    text(20, 280, "BL", 0xffffff);
+    text(132, 280, "BR", 0xffffff);
+    text(24, 62, "CORNER / EDGE", 0xffffff);
+    text(24, 96, "WHITE   0 px", colors[0]);
+    text(24, 118, "RED     4 px", colors[1]);
+    text(24, 140, "YELLOW  8 px", colors[2]);
+    text(24, 162, "GREEN  12 px", colors[3]);
+    text(24, 184, "CYAN   16 px", colors[4]);
+    text(24, 218, "MAGENTA R24", 0xff40ff);
+    text(24, 242, "172x320 / 180", 0xffffff);
+}
+
+static void show_page(bool corners)
+{
+    test.corners_page = corners;
+    lv_obj_clean(test.screen);
+    if (corners) {
+        draw_corners_page();
+    } else {
+        draw_fps_page();
+    }
+    refresh_and_wait();
+    /* Exclude page construction and its first frame from measured intervals. */
+    test.page_start_us = esp_timer_get_time();
+    test.report_start_us = test.page_start_us;
+    test.last_frame_us = test.page_start_us;
+    test.longest_interval_us = 0;
+    test.sample_frames = 0;
+    test.total_frames = 0;
+    ESP_LOGI(TAG, "PAGE %s: CASE 7, ROT=180, gap=(34,0), hold=10s",
+             corners ? "CORNERS" : "FPS");
+}
+
+static int bounce(int64_t elapsed_us, int64_t period_us, int distance)
+{
+    const int64_t phase = elapsed_us % period_us;
+    const int64_t ramp = phase < period_us / 2 ? phase : period_us - phase;
+    return (int)(ramp * distance * 2 / period_us);
+}
+
+static void update_page(lv_timer_t *timer)
 {
     (void)timer;
-    test.gap_index = (test.gap_index + 1) % 3;
-    if (test.gap_index == 0) {
-        test.rotation_index = (test.rotation_index + 1) % 4;
+    const int64_t now = esp_timer_get_time();
+    const int64_t elapsed = now - test.page_start_us;
+    if (elapsed >= PAGE_HOLD_US) {
+        show_page(!test.corners_page);
+        return;
     }
-    /* LVGL invokes timer callbacks with the official port's mutex held. */
-    show_case();
+    if (test.corners_page) {
+        return;
+    }
+
+    lv_obj_set_x(test.vertical_bar, 16 + bounce(elapsed, 2000000, 134));
+    lv_obj_set_y(test.horizontal_bar, 132 + bounce(elapsed, 3000000, 140));
+    lv_label_set_text_fmt(test.frame_label, "FRAME %lu", (unsigned long)++test.total_frames);
+    refresh_and_wait();
+    const int64_t done = esp_timer_get_time();
+    const int64_t interval = done - test.last_frame_us;
+    test.last_frame_us = done;
+    if (interval > test.longest_interval_us) {
+        test.longest_interval_us = interval;
+    }
+    ++test.sample_frames;
+    const int64_t window = done - test.report_start_us;
+    if (window >= REPORT_US) {
+        /* Fixed-point tenths avoid depending on LVGL's float printf configuration. */
+        const unsigned fps10 = (unsigned)((int64_t)test.sample_frames * 10000000 / window);
+        const unsigned avg10 = (unsigned)(window / test.sample_frames / 100);
+        const unsigned max10 = (unsigned)(test.longest_interval_us / 100);
+        lv_label_set_text_fmt(test.stats, "FPS %u.%u\nAVG %u.%u ms\nMAX %u.%u ms",
+                              fps10 / 10, fps10 % 10, avg10 / 10, avg10 % 10,
+                              max10 / 10, max10 % 10);
+        ESP_LOGI(TAG, "FPS %u.%u, avg=%u.%u ms, max=%u.%u ms, frames=%lu (full frame, SPI complete)",
+                 fps10 / 10, fps10 % 10, avg10 / 10, avg10 % 10,
+                 max10 / 10, max10 % 10, (unsigned long)test.sample_frames);
+        test.report_start_us = done;
+        test.sample_frames = 0;
+        test.longest_interval_us = 0;
+        /* Updating the statistics label requests another refresh; draw it next frame. */
+        lv_timer_pause(lv_display_get_refr_timer(test.display));
+    }
 }
-#endif
 
 void lcd_test_start(lv_display_t *display, const lcd_st7789_t *lcd)
 {
-    _Static_assert(LCD_TEST_ROTATION_INDEX >= 0 && LCD_TEST_ROTATION_INDEX < 4,
-                   "Invalid LCD rotation index");
-    _Static_assert(LCD_TEST_GAP_INDEX >= 0 && LCD_TEST_GAP_INDEX < 3,
-                   "Invalid LCD gap index");
     test.display = display;
     test.lcd = *lcd;
-    test.rotation_index = LCD_TEST_ROTATION_INDEX;
-    test.gap_index = LCD_TEST_GAP_INDEX;
-
     ESP_ERROR_CHECK(lvgl_port_lock(0) ? ESP_OK : ESP_ERR_TIMEOUT);
-    show_case();
-#if LCD_TEST_AUTO_CYCLE
-    lv_timer_t *timer = lv_timer_create(next_case, LCD_TEST_HOLD_MS, NULL);
+    /* This diagnostic drives refresh itself, so the default refresh timer must not
+     * produce extra uncounted frames or impose its normal frame-rate limit. */
+    lv_timer_pause(lv_display_get_refr_timer(display));
+    lcd_st7789_backlight(false);
+    ESP_ERROR_CHECK(esp_lcd_panel_io_tx_param(lcd->io, -1, NULL, 0));
+    test.screen = lv_display_get_screen_active(display);
+    lv_obj_clean(test.screen);
+    lv_obj_remove_style_all(test.screen);
+    lv_obj_remove_flag(test.screen, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_color(test.screen, lv_color_hex(0x080c14), 0);
+    lv_obj_set_style_bg_opa(test.screen, LV_OPA_COVER, 0);
+    lv_display_set_rotation(display, LV_DISPLAY_ROTATION_180);
+    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(lcd->panel, 0, 0));
+    lv_display_set_resolution(display, LCD_ST7789_RAM_WIDTH, LCD_ST7789_RAM_HEIGHT);
+    refresh_and_wait();
+    lv_display_set_resolution(display, WIDTH, HEIGHT);
+    ESP_ERROR_CHECK(esp_lcd_panel_set_gap(lcd->panel, 34, 0));
+    show_page(false);
+    lcd_st7789_backlight(true);
+    lv_timer_t *timer = lv_timer_create(update_page, 1, NULL);
     ESP_ERROR_CHECK(timer ? ESP_OK : ESP_ERR_NO_MEM);
-#endif
     lvgl_port_unlock();
 }

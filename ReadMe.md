@@ -10,15 +10,15 @@
 
 | 目录 | 对应硬件 / MCU | 状态 |
 | --- | --- | --- |
-| [code/PM_Controller](code/PM_Controller/) | 第二代主控器 PM_Controller Rev2.0 / ESP32-S3-WROOM-1-N8R8 | 官方 LVGL 移植组件与 ST7789 屏幕测试，已配置双 OTA 分区 |
+| [code/PM_Controller](code/PM_Controller/) | 第二代主控器 PM_Controller Rev2.0 / ESP32-S3-WROOM-1-N8R8 | 官方 LVGL 移植组件、三页竖屏 UI，已配置双 OTA 分区；新 UI 未上板验证 |
 | [code/FocusUnit](code/FocusUnit/) | 独立对焦组件 / STM32F030F4Px | 寻零校验、重试及开环控制已实现，用户确认测试没有问题 |
 | [code/Scripts](code/Scripts/) | 辅助计算脚本 | 按脚本用途使用 |
 | [archive/PM_Controller_Rev1_x](archive/PM_Controller_Rev1_x/) | 第一代主控系统 / STM32G474 + STM32L011 | 历史固件归档，不适用于第二代主控器 |
-| [GuiGuider/MainControl](GuiGuider/MainControl/) | 现有 GUI Guider 界面设计资源 | 保留原位置；用于新主控前需确认移植适配 |
+| [UI设计](UI设计/) | 旧 GUI Guider 工程、竖屏设计图与说明 | 旧工程保留；正式 UI 使用原生 LVGL 9.3 C 代码 |
 
 ## 开发入口
 
-第二代主控器在 [code/PM_Controller](code/PM_Controller/README.md) 开发，使用 ESP-IDF 6.1、官方 esp_lcd ST7789 驱动和 esp_lvgl_port。当前方向与偏移测试使用 LVGL 控件绘制；74HC165 已实现 6 个按键的消抖、长短按及事件标志位读取；24C64 已实现分页访问和带版本、CRC 的参数轮换保存；闪光输出已实现默认 20 ms 单次高电平脉冲。板级初始化、驱动和测试代码分目录存放。引脚和双 OTA 分区已配置；电机、BLE、手动开启 Wi-Fi 和 OTA 业务后续实现。
+第二代主控器在 [code/PM_Controller](code/PM_Controller/README.md) 开发，使用 ESP-IDF 6.1、官方 esp_lcd ST7789 驱动和 esp_lvgl_port。默认启动原生 LVGL 三页竖屏 UI，方向 7，使用目前可用的 KEY1–3，屏幕测试源码保留。74HC165 已实现 6 个按键的消抖、长短按及事件标志位读取；24C64 已实现分页访问和带版本、CRC 的参数轮换保存；闪光输出已实现默认 20 ms 单次高电平脉冲。引脚和双 OTA 分区已配置；电机、BLE、手动开启 Wi-Fi 和 OTA 业务后续实现。2026-10-17 新 UI 未编译、未测试、未烧录。
 
 对焦组件的配置、模块接口、构建与验证记录见 [FocusUnit 工程说明](code/FocusUnit/AGENT.md)。它是独立组件，不随旧主控固件一起归档。
 
