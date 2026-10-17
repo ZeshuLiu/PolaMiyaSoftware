@@ -84,7 +84,6 @@ static void handle_keys(hc165_key_events_t keys)
 static void ui_task(void *argument)
 {
     (void)argument;
-    TickType_t wake_tick = xTaskGetTickCount();
     int64_t history_tick = esp_timer_get_time() / HISTORY_INTERVAL_US;
     while (1) {
         handle_keys(hc165_take_events());
@@ -122,7 +121,9 @@ static void ui_task(void *argument)
         }
         ui_view_settings(ui.brightness, ui.editing, message);
         lvgl_port_unlock();
-        vTaskDelayUntil(&wake_tick, pdMS_TO_TICKS(50));
+        /* Do not replay missed UI ticks after waiting for a slow render/EEPROM.
+         * History already uses monotonic time and marks missing sample slots. */
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 

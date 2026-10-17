@@ -2,6 +2,8 @@
 
 2026-10-18：用户确认当前竖屏 UI、三键映射和 ADC 接入版本“测试 OK”，据此保存本地 Git 版本。本轮未代为构建、测试或烧录；ADC 实际采样率、计量精度和其它专项指标未提供量化记录。具体按键功能统一在 [ui.c 的 handle_keys()](main/app/ui/ui.c) 中实现，扫描识别与图标显示分别由 HC165 驱动和 UI 视图负责。
 
+同日后续：用户报告距离主屏 IDLE1 看门狗，补充堆栈停在 `lv_draw_sw_line()`。本轮已减少无变化数码段/样式重绘和隐藏页更新、取消 UI 过期周期补跑，并增加慢帧日志；没有调整看门狗或 SDK 配置。用户已复测并确认 OK；本轮未代为编译、测试或烧录，详见 [显示排查记录](main/app/display/README.md)。
+
 对应 PCB：PM_Controller Rev2.x，当前为 Rev2.0。模组：ESP32-S3-WROOM-1-N8R8，8 MB Flash、8 MB Octal PSRAM。开发环境为 ESP-IDF 6.1。当前 FreeRTOS tick 为 1 kHz（`CONFIG_FREERTOS_HZ=1000`）；按键扫描目标周期 5 ms，EEPROM 忙等待延时为 1 tick。消抖、长按、LVGL 定时与 GPTimer 目标脉宽仍按各自的时间单位配置。
 
 `app_main()` 将闪光输出初始化为低电平，接入 GPIO42 快门下降沿中断，启动 74HC165 按键扫描，加载 24C64 参数，初始化官方 ST7789 驱动和 LVGL，并启动三页竖屏 UI。KEY1–KEY3 用于页面导航、背光调节和显式保存；KEY4–KEY6 暂未接入业务。主程序每 1 s 打印测距及 ADC/电源快照。参数修改与持久化提交分开。引脚和双 OTA 分区已整理，电机、蓝牙、Wi-Fi 和 OTA 业务尚未接入。

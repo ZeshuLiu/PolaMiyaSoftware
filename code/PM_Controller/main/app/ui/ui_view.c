@@ -32,6 +32,8 @@ static struct {
     lv_obj_t *battery_values;
     lv_obj_t *motor_values;
     lv_obj_t *segments[2][4][7];
+    uint8_t digit_masks[2][4];
+    bool text_number[2];
     lv_obj_t *number_override[2];
     lv_obj_t *decimal[2];
     lv_obj_t *focus_pointer;
@@ -51,6 +53,7 @@ static struct {
     lv_obj_t *edit_status;
     unsigned page;
     bool editing;
+    int battery_percent;
 } view;
 
 static void set_text(lv_obj_t *obj, const char *value)
@@ -109,6 +112,7 @@ static lv_obj_t *page(lv_obj_t *screen, const char *title, const char *footer)
 
 static void create_distance_digits(lv_obj_t *parent, unsigned number, int x, uint32_t color)
 {
+    memset(view.digit_masks[number], 0xff, sizeof(view.digit_masks[number]));
     /* Seven-segment digits keep the large number independent of sdkconfig fonts.
      * Segment order: top, upper-right, lower-right, bottom, lower-left,
      * upper-left, middle. All geometry is in portrait pixels. */
@@ -132,10 +136,14 @@ static void create_distance_digits(lv_obj_t *parent, unsigned number, int x, uin
 
 static void set_digit(unsigned number, unsigned digit, unsigned mask)
 {
+    if (view.digit_masks[number][digit] == mask) return;
     for (unsigned segment = 0; segment < 7; ++segment) {
+        /* LVGL local style setters invalidate even when the value is unchanged. */
+        if (((view.digit_masks[number][digit] ^ mask) & (1U << segment)) == 0) continue;
         lv_obj_set_style_bg_opa(view.segments[number][digit][segment],
                                mask & (1U << segment) ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
     }
+    view.digit_masks[number][digit] = (uint8_t)mask;
 }
 
 static int distance_scale_x(uint32_t distance_mm)
@@ -184,6 +192,8 @@ static void create_distance_scale(lv_obj_t *parent)
 
 void ui_view_create(lv_display_t *display)
 {
+    view.page = UI_PAGE_COUNT; /* First show must hide the other two pages. */
+    view.battery_percent = -2; /* First battery update must draw the unknown state. */
     lv_obj_t *screen = lv_display_get_screen_active(display);
     lv_obj_clean(screen);
     lv_obj_remove_style_all(screen);
@@ -277,6 +287,7 @@ void ui_view_create(lv_display_t *display)
 
 void ui_view_show(unsigned page_index)
 {
+    if (view.page == page_index) return;
     view.page = page_index;
     for (unsigned i = 0; i < UI_PAGE_COUNT; ++i) {
         if (i == page_index) {
@@ -290,6 +301,8 @@ void ui_view_show(unsigned page_index)
 
 void ui_view_battery(int percent)
 {
+    if (view.battery_percent == percent) return;
+    view.battery_percent = percent;
     if (percent < 0) {
         lv_obj_add_flag(view.battery_fill, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(view.battery_unknown, LV_OBJ_FLAG_HIDDEN);
@@ -306,7 +319,8 @@ void ui_view_battery(int percent)
 
 void ui_view_power(const power_sample_t *sample)
 {
-    ui_view_battery(sample->battery_percent);
+    if (view.page == UI_HOME) ui_view_battery(sample->battery_percent);
+    if (view.page != UI_INFO) return;
     if (sample->battery_valid) {
         set_text_fmt(view.battery_values, "%lu.%02luV / ~%d%%",
                      (unsigned long)(sample->battery_mv / 1000),
@@ -346,7 +360,10 @@ static void set_distance_number(unsigned number, ui_distance_state_t state, uint
     } else {
         set_text(view.number_override[number], "");
     }
-    lv_obj_set_style_bg_opa(view.decimal[number], text_number ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
+    if (view.text_number[number] != text_number) {
+        lv_obj_set_style_bg_opa(view.decimal[number], text_number ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
+        view.text_number[number] = text_number;
+    }
     for (int digit = 3; digit >= 0; --digit) {
         unsigned mask = valid ? masks[cm % 10U] : 0x40;
         if (text_number) mask = 0;
@@ -372,6 +389,7 @@ static void set_distance_pointer(lv_obj_t *pointer, ui_distance_state_t state, u
 
 void ui_view_range(const focus_distance_t *focus, const sdm50_sample_t *actual)
 {
+    if (view.page != UI_HOME) return;
     const ui_distance_state_t focus_state = focus->state == FOCUS_DISTANCE_FINITE ? UI_DISTANCE_FINITE :
                                            focus->state == FOCUS_DISTANCE_INFINITY ? UI_DISTANCE_INFINITY :
                                                                                    UI_DISTANCE_UNAVAILABLE;
@@ -422,6 +440,7 @@ void ui_view_history(int32_t distance_mm, unsigned elapsed_slots)
 
 void ui_view_uptime(uint64_t seconds)
 {
+    if (view.page != UI_HOME) return;
     set_text_fmt(view.uptime, "UP %02lu:%02u:%02u",
                           (unsigned long)(seconds / 3600),
                           (unsigned)(seconds / 60 % 60), (unsigned)(seconds % 60));
@@ -430,6 +449,7 @@ void ui_view_uptime(uint64_t seconds)
 void ui_view_info(const settings_values_t *values, const settings_status_t *status,
                   bool available)
 {
+    if (view.page != UI_INFO) return;
     if (!available) {
         set_text(view.counts[0], "R --");
         set_text(view.counts[1], "S --");
@@ -450,11 +470,14 @@ void ui_view_info(const settings_values_t *values, const settings_status_t *stat
 
 void ui_view_settings(unsigned percent, bool editing, const char *message)
 {
+    if (view.page != UI_SETUP) return;
     set_text_fmt(view.brightness, "%u %%", percent);
-    lv_obj_set_style_text_color(view.brightness, lv_color_hex(editing ? COLOR_ACCENT : COLOR_TEXT), 0);
+    if (view.editing != editing) {
+        lv_obj_set_style_text_color(view.brightness, lv_color_hex(editing ? COLOR_ACCENT : COLOR_TEXT), 0);
+        lv_obj_set_y(view.save_status, editing ? 180 : 155);
+    }
     lv_bar_set_value(view.brightness_bar, (int32_t)percent, LV_ANIM_OFF);
     set_text(view.edit_status, editing ? "EDITING" : "");
-    lv_obj_set_y(view.save_status, editing ? 180 : 155);
     set_text(view.save_status, message);
     view.editing = editing;
     ui_key_hints_update(view.page == UI_SETUP, editing);
