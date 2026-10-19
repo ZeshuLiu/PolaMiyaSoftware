@@ -9,10 +9,11 @@
 
 enum { UI_HOME, UI_INFO, UI_SETUP, UI_PAGE_COUNT };
 
-/* HOME middle-key list order: SETTINGS -> FOCUS -> INFO -> SETTINGS. */
+/* HOME middle-key list order: SETTINGS -> FOCUS -> EJECT -> INFO -> SETTINGS. */
 enum {
     UI_HOME_FUNC_SETTINGS,
     UI_HOME_FUNC_FOCUS,
+    UI_HOME_FUNC_EJECT,
     UI_HOME_FUNC_INFO,
     UI_HOME_FUNC_COUNT,
 };

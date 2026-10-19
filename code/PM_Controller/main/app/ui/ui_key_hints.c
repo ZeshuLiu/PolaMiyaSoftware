@@ -10,7 +10,7 @@
 #define ARROW_COLOR         0xbfd6c9
 #define ICON_X              157
 
-enum { FUNC_SETTINGS, FUNC_FOCUS, FUNC_INFO, FUNC_COUNT };
+enum { FUNC_SETTINGS, FUNC_FOCUS, FUNC_EJECT, FUNC_INFO, FUNC_COUNT };
 enum { PAGE_GEAR, PAGE_TUNE, PAGE_INFO, PAGE_PLUS, PAGE_DONE, PAGE_MINUS,
        PAGE_ICON_COUNT };
 
@@ -83,10 +83,12 @@ static lv_obj_t *create_icon_group(lv_obj_t *parent, int x, int y, int size,
                                    unsigned func)
 {
     const lv_image_dsc_t *current[] = {
-        &ui_icon_gear_current, &ui_icon_focus_current, &ui_icon_info_current,
+        &ui_icon_gear_current, &ui_icon_focus_current, &ui_icon_eject_current,
+        &ui_icon_info_current,
     };
     const lv_image_dsc_t *candidate[] = {
-        &ui_icon_gear_candidate, &ui_icon_focus_candidate, &ui_icon_info_candidate,
+        &ui_icon_gear_candidate, &ui_icon_focus_candidate, &ui_icon_eject_candidate,
+        &ui_icon_info_candidate,
     };
     lv_obj_t *group = plain_object(parent, x, y, size, size == 14 ? 14 : 12);
     icon_image(group, size == 14 ? current[func] : candidate[func], ICON_COLOR);
@@ -193,8 +195,9 @@ void ui_key_hints_home(unsigned current, bool editing)
     last_func = current;
     last_edit = editing;
 
-    show_obj(arrow_up, true);
-    show_obj(arrow_down, true);
+    const bool navigation = !(current == FUNC_EJECT && editing);
+    show_obj(arrow_up, navigation);
+    show_obj(arrow_down, navigation);
     for (unsigned i = 0; i < PAGE_ICON_COUNT; ++i) {
         show_obj(page_icons[i], false);
     }

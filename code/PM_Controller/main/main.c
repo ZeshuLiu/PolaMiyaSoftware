@@ -2,6 +2,7 @@
 #include "boot_screen.h"
 #include "hc165.h"
 #include "flash_trigger.h"
+#include "film_motor.h"
 #include "ui.h"
 #include "lcd_st7789.h"
 #include "settings.h"
@@ -71,6 +72,8 @@ void app_main(void)
     /* Establish the optocoupler's idle level before the slower LCD reset and
      * first frame. Full trigger initialization follows the visible boot screen. */
     ESP_ERROR_CHECK(flash_trigger_prepare_output());
+    /* Motor starts braked before the slower display initialization. */
+    ESP_ERROR_CHECK(film_motor_init());
     lcd_st7789_t lcd = {0};
     ESP_LOGI(TAG, "lcd_st7789_init begin");
     lcd_st7789_init(&lcd);

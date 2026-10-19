@@ -145,7 +145,7 @@ function font(name, data) {
                      {mask:true,viewBox:'36 56 100 48',assetDefs:bootParts.defs});
         await raster('ui_key_rail','<rect width="172" height="320" fill="#080b0c"/><use href="#rail"/>',17,280,{viewBox:'155 20 17 280'});
         for(const [name,size,offset] of [['current',14,0],['candidate',11,.5]]) {
-            for(const icon of ['gear','focus','info']) await raster(`ui_icon_${icon}_${name}`,`<g color="#ffffff" transform="translate(0 ${offset}) scale(${size/14})"><use href="#ico-${icon}"/></g>`,size,size+(offset?1:0),{alpha:true});
+            for(const icon of ['gear','focus','eject','info']) await raster(`ui_icon_${icon}_${name}`,`<g color="#ffffff" transform="translate(0 ${offset}) scale(${size/14})"><use href="#ico-${icon}"/></g>`,size,size+(offset?1:0),{alpha:true});
         }
         await raster('ui_icon_up','<g color="#ffffff"><use href="#ico-up"/></g>',14,14,{alpha:true});
         await raster('ui_icon_down','<g color="#ffffff"><use href="#ico-down"/></g>',14,14,{alpha:true});

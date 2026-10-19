@@ -6,6 +6,7 @@
 #include "sdm50.h"
 #include "settings.h"
 #include "power_monitor.h"
+#include "film_motor.h"
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
@@ -28,6 +29,7 @@ static struct {
     unsigned home_func;
     bool editing;
     bool focus_editing;
+    bool motor_running;
     bool focus_target_active;
     int32_t focus_target_mm;
     const char *save_message;
@@ -94,6 +96,17 @@ static void handle_keys(hc165_key_events_t keys)
                     ui.page = UI_INFO;
                     ui.editing = false;
                     break;
+                case UI_HOME_FUNC_EJECT: {
+                    const bool running = !ui.motor_running;
+                    const esp_err_t result = film_motor_set_running(running);
+                    if (result == ESP_OK) {
+                        ui.motor_running = running;
+                        ESP_LOGI(TAG, "Film motor ramp %s", running ? "start" : "stop");
+                    } else {
+                        ESP_LOGW(TAG, "Film motor command failed: %s", esp_err_to_name(result));
+                    }
+                    break;
+                }
                 default:
                     break;
                 }
@@ -113,7 +126,10 @@ static void handle_keys(hc165_key_events_t keys)
     }
 
     if (ui.page == UI_HOME) {
-        if (ui.focus_editing) {
+        if (ui.motor_running) {
+            /* Keep EJECT selected; a K2 short press remains the stop action. */
+            return;
+        } else if (ui.focus_editing) {
             if (next) {
                 ui.focus_target_mm = ui.focus_target_mm + FOCUS_STEP_MM >= FOCUS_MAX_MM
                                          ? FOCUS_MAX_MM
@@ -186,7 +202,8 @@ static void ui_task(void *argument)
 
         ESP_ERROR_CHECK(lvgl_port_lock(0) ? ESP_OK : ESP_ERR_TIMEOUT);
         ui_view_show(ui.page);
-        ui_view_key_hints(ui.page, ui.home_func, ui.focus_editing, ui.editing);
+        ui_view_key_hints(ui.page, ui.home_func,
+                          ui.focus_editing || ui.motor_running, ui.editing);
         ui_view_range(&focus, &sample);
         ui_view_focus_blink(focus_visible);
         ui_view_power(&power);

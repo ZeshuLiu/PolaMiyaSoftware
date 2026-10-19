@@ -14,7 +14,7 @@
 
 ## 电机
 
-当前生产 BOM 的 R2 为 1000 Ω，DRV8251A 典型 IPROPI 镜像比例为 1575 µA/A，按 `I_mA = V_IPROPI_mV × 1000000 / (1000 × 1575)` 换算。该读数为 IPROPI 经板上 RC 和窗口平均后的估算，不是瞬时绕组峰值；与 PWM/制动/滑行状态有关，未实现过流、堵转或电机控制业务。
+当前生产 BOM 的 R2 为 1000 Ω，DRV8251A 典型 IPROPI 镜像比例为 1575 µA/A，按 `I_mA = V_IPROPI_mV × 1000000 / (1000 × 1575)` 换算。该读数为 IPROPI 经板上 RC 和窗口平均后的估算，不是瞬时绕组峰值；与 PWM/制动/滑行状态有关，未实现过流或堵转保护；吐片电机手动控制见 [吐片电机](../../drivers/film_motor/README.md)。
 
 依据：[TI DRV8251A 数据手册](https://www.ti.com/lit/ds/symlink/drv8251a.pdf) 的电流镜比例及 IPROPI 说明。
 

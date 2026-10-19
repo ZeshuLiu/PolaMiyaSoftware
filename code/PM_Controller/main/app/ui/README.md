@@ -1,5 +1,7 @@
 # 竖屏 UI
 
+- `EJECT` 为吐片电机手动启停：KEY2 选中后运行，再短按停止，启停目标斜坡各 1 s；运行时固定在此选项并隐藏上下箭头。GPIO1 反向 PWM、GPIO2 恒高、20 kHz，运行终点 GPIO1 恒低。用户已确认解除驱动芯片限流后运行正常，见 [吐片电机](../../drivers/film_motor/README.md)。
+
 2026-10-19：当前以 Space Mono 配合 Roboto Mono。视觉基准为 `UI设计/PortraitUI/home.svg`，预览为同目录 `home.png`；临时方案和中间生成脚本已清理。当前实现要点：
 
 启动时先显示 [开机画面](../boot_screen/README.md)，外设初始化完成后再调用 `ui_start()`。开机画面与业务 UI 共用同一活动屏，`ui_view_create()` 清理狗图、启动日志和 MAC 对象；已开启的背光保持，存储亮度在接管时应用。

@@ -39,7 +39,7 @@
 启动顺序：
 
 ```text
-flash_trigger_prepare_output（GPIO38 低电平）→ lcd_st7789_init → display_init → boot_screen_start
+flash_trigger_prepare_output（GPIO38 低电平）→ film_motor_init（GPIO1/2 制动）→ lcd_st7789_init → display_init → boot_screen_start
 → flash_trigger_init / shutter_init → hc165_init → sdm50_init / sdm50_start → settings_init
 → adc_measure_init → boot_screen_finish → ui_start
 ```
