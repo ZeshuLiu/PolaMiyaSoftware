@@ -16,6 +16,7 @@ idf_component_register(
         "app/ui/ui.c"
         "app/ui/ui_view.c"
         "app/ui/ui_key_hints.c"
+        "app/ui/ui_home_assets.c"
         "app/focus_distance/focus_distance.c"
         "app/power_monitor/power_monitor.c"
     INCLUDE_DIRS

@@ -14,6 +14,10 @@
 #include "freertos/task.h"
 
 #define HISTORY_INTERVAL_US 100000LL
+#define FOCUS_STEP_MM 50
+#define FOCUS_MIN_MM 50
+#define FOCUS_MAX_MM 20000
+#define FOCUS_BLINK_HALF_US 312500LL
 
 static const char *TAG = "ui";
 
@@ -21,13 +25,26 @@ static const char *TAG = "ui";
 static struct {
     unsigned page;
     unsigned brightness;
+    unsigned home_func;
     bool editing;
+    bool focus_editing;
+    bool focus_target_active;
+    int32_t focus_target_mm;
     const char *save_message;
 } ui;
 
+/* Replace this placeholder when the film-counter driver is connected.
+ * 0..8 remaining shots; the UI task samples it every 50 ms. */
+static volatile unsigned film_remaining = 6;
+
+void ui_set_film_remaining(unsigned remaining)
+{
+    film_remaining = remaining > 8 ? 8 : remaining;
+}
+
 static void handle_keys(hc165_key_events_t keys)
 {
-    /* K3 (top): up/right/increase. K1 (bottom): down/left/decrease.
+    /* K3 (top): up/previous/increase. K1 (bottom): down/next/decrease.
      * K2 (middle) owns confirmation and execution. K4-6 are not connected. */
     if (keys.long_press & HC165_KEY2) {
         if (ui.page == UI_SETUP) {
@@ -47,7 +64,42 @@ static void handle_keys(hc165_key_events_t keys)
     if (keys.short_press & HC165_KEY2) {
         if (ui.page == UI_SETUP) {
             ui.editing = !ui.editing;
+        } else if (ui.page == UI_HOME) {
+            if (ui.focus_editing) {
+                ui.focus_editing = false;
+            } else {
+                switch (ui.home_func) {
+                case UI_HOME_FUNC_SETTINGS:
+                    ui.page = UI_SETUP;
+                    ui.editing = false;
+                    break;
+                case UI_HOME_FUNC_FOCUS:
+                    /* Seed the first edit from the current reading, not the
+                     * startup WAITING placeholder. Later edits retain the target. */
+                    if (!ui.focus_target_active) {
+                        sdm50_sample_t sample;
+                        if (sdm50_get_sample(&sample) == ESP_OK) {
+                            const focus_distance_t focus = focus_distance_get(&sample);
+                            if (focus.state == FOCUS_DISTANCE_FINITE) {
+                                ui.focus_target_mm = (int32_t)focus.distance_mm;
+                                if (ui.focus_target_mm < FOCUS_MIN_MM) ui.focus_target_mm = FOCUS_MIN_MM;
+                                if (ui.focus_target_mm > FOCUS_MAX_MM) ui.focus_target_mm = FOCUS_MAX_MM;
+                            }
+                        }
+                    }
+                    ui.focus_target_active = true;
+                    ui.focus_editing = true;
+                    break;
+                case UI_HOME_FUNC_INFO:
+                    ui.page = UI_INFO;
+                    ui.editing = false;
+                    break;
+                default:
+                    break;
+                }
+            }
         } else {
+            /* INFO: K2 keeps the previous shortcut into SETTINGS. */
             ui.page = UI_SETUP;
             ui.editing = false;
         }
@@ -59,7 +111,25 @@ static void handle_keys(hc165_key_events_t keys)
     if (previous == next) {
         return; /* No key, or conflicting simultaneous directions. */
     }
-    if (ui.page == UI_SETUP && ui.editing) {
+
+    if (ui.page == UI_HOME) {
+        if (ui.focus_editing) {
+            if (next) {
+                ui.focus_target_mm = ui.focus_target_mm + FOCUS_STEP_MM >= FOCUS_MAX_MM
+                                         ? FOCUS_MAX_MM
+                                         : ui.focus_target_mm + FOCUS_STEP_MM;
+            } else {
+                ui.focus_target_mm = ui.focus_target_mm - FOCUS_STEP_MM <= FOCUS_MIN_MM
+                                         ? FOCUS_MIN_MM
+                                         : ui.focus_target_mm - FOCUS_STEP_MM;
+            }
+        } else {
+            /* K3 moves up to the previous function, K1 down to the next. */
+            ui.home_func = next ? (ui.home_func + UI_HOME_FUNC_COUNT - 1) %
+                                      UI_HOME_FUNC_COUNT
+                                : (ui.home_func + 1) % UI_HOME_FUNC_COUNT;
+        }
+    } else if (ui.page == UI_SETUP && ui.editing) {
         unsigned percent = ui.brightness;
         if (next) {
             percent = percent > 95 ? 100 : percent + 5;
@@ -78,6 +148,7 @@ static void handle_keys(hc165_key_events_t keys)
         }
     } else {
         ui.page = (ui.page + (next ? 1 : UI_PAGE_COUNT - 1)) % UI_PAGE_COUNT;
+        ui.focus_editing = false;
     }
 }
 
@@ -91,7 +162,15 @@ static void ui_task(void *argument)
         if (sdm50_get_sample(&sample) != ESP_OK) {
             sample.status = SDM50_RX_ERROR;
         }
-        const focus_distance_t focus = focus_distance_get(&sample);
+        focus_distance_t focus = focus_distance_get(&sample);
+        if (ui.focus_target_active) {
+            /* Local setpoint placeholder until the FocusUnit position command
+             * and calibration are connected. */
+            focus.state = FOCUS_DISTANCE_FINITE;
+            focus.distance_mm = (uint32_t)ui.focus_target_mm;
+            focus.using_actual = false;
+        }
+
         power_sample_t power;
         power_monitor_get(&power);
         settings_values_t values = {0};
@@ -102,16 +181,22 @@ static void ui_task(void *argument)
         const int64_t current_tick = now / HISTORY_INTERVAL_US;
         int64_t elapsed_slots = current_tick - history_tick;
         if (elapsed_slots > 101) elapsed_slots = 101;
+        const bool focus_visible = !ui.focus_editing ||
+                                   ((now / FOCUS_BLINK_HALF_US) % 2 == 0);
 
         ESP_ERROR_CHECK(lvgl_port_lock(0) ? ESP_OK : ESP_ERR_TIMEOUT);
         ui_view_show(ui.page);
+        ui_view_key_hints(ui.page, ui.home_func, ui.focus_editing, ui.editing);
         ui_view_range(&focus, &sample);
+        ui_view_focus_blink(focus_visible);
         ui_view_power(&power);
         if (elapsed_slots > 0) {
-            ui_view_history(sample.status == SDM50_VALID ? sample.distance_mm : LV_CHART_POINT_NONE,
+            ui_view_history(sample.status == SDM50_VALID ? sample.distance_mm
+                                                        : LV_CHART_POINT_NONE,
                             (unsigned)elapsed_slots);
             history_tick = current_tick;
         }
+        ui_view_film(film_remaining);
         ui_view_uptime((uint64_t)(now / 1000000));
         ui_view_info(&values, &status, settings_available);
         const char *message = ui.save_message;
@@ -129,6 +214,9 @@ static void ui_task(void *argument)
 
 void ui_start(lv_display_t *display)
 {
+    ui.home_func = UI_HOME_FUNC_FOCUS;
+    ui.focus_target_mm = 2500;
+
     settings_values_t values;
     ui.brightness = settings_get(&values) == ESP_OK ? (unsigned)values.backlight_percent : 100;
     lcd_st7789_set_brightness(ui.brightness);
@@ -137,6 +225,9 @@ void ui_start(lv_display_t *display)
     sdm50_sample_t sample = {.status = SDM50_WAITING};
     const focus_distance_t focus = focus_distance_get(&sample);
     ui_view_range(&focus, &sample);
+    ui_view_key_hints(UI_HOME, ui.home_func, false, false);
+    ui_view_film(film_remaining);
+    ui_view_uptime(0);
     ui_view_settings(ui.brightness, false, "");
     /* Request the initial page before starting the nonblocking backlight fade. */
     lv_refr_now(display);
@@ -144,5 +235,5 @@ void ui_start(lv_display_t *display)
     lcd_st7789_backlight(true);
     ESP_ERROR_CHECK(xTaskCreate(ui_task, "ui", 4096, NULL, 3, NULL) == pdPASS
                     ? ESP_OK : ESP_ERR_NO_MEM);
-    ESP_LOGI(TAG, "UI ready: CASE 7, 172x320; K3 right/increase, K1 left/decrease, K2 confirm/hold save");
+    ESP_LOGI(TAG, "UI ready: CASE 7, 172x320; HOME list, K3 up/increase, K1 down/decrease, K2 confirm/hold save");
 }
