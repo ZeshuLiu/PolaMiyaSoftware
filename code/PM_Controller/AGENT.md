@@ -39,8 +39,9 @@
 启动顺序：
 
 ```text
-flash_trigger_init → shutter_init → hc165_init → sdm50_init / sdm50_start → settings_init
-→ adc_measure_init → lcd_st7789_init → display_init → ui_start
+flash_trigger_prepare_output（GPIO38 低电平）→ lcd_st7789_init → display_init → boot_screen_start
+→ flash_trigger_init / shutter_init → hc165_init → sdm50_init / sdm50_start → settings_init
+→ adc_measure_init → boot_screen_finish → ui_start
 ```
 
 闪光、按键和显示初始化失败停止启动。参数存储失败记录错误并继续显示启动；参数锁成功分配后，器件错误时仍可使用 RAM 默认值，持久化提交被禁止。
@@ -51,6 +52,7 @@ flash_trigger_init → shutter_init → hc165_init → sdm50_init / sdm50_start 
 | --- | --- | --- |
 | 屏幕板级初始化 | [drivers/st7789](main/drivers/st7789/)；`lcd_st7789_init()` | 官方 ST7789 驱动，SPI2、40 MHz、RGB565；只负责初始化、句柄和背光 |
 | LVGL 接入 | [app/display](main/app/display/)；`display_init()` | 官方移植层管理任务、时钟、双缓冲、刷新、字节交换及旋转；CASE 7、完整 RAM 清屏及 gap=(34,0) 在此配置；不要另外注册 DMA 完成回调 |
+| 开机画面 | [app/boot_screen](main/app/boot_screen/README.md)；`boot_screen_start/begin/complete/finish()` | 启动任务调用，六行初始化状态、白底黑狗及出厂 MAC；外设初始化不持有显示锁；完成后由 `ui_start()` 接管 |
 | 竖屏 UI | [app/ui](main/app/ui/README.md)；`ui_start()` | 默认启动三页界面；只使用 KEY1–3，KEY4–6 暂未接线；UI 为 HC165 事件唯一消费者，EEPROM 保存不得持有 LVGL 锁 |
 | 对焦物距 | [app/focus_distance](main/app/focus_distance/README.md)；`focus_distance_get()` | 当前借用实测距离，内部以 using_actual 标记占位来源，屏幕不显示状态行；后续接 FocusUnit 通信和位置标定，编码器计数不能直接当毫米；INF 独立状态 |
 | ADC 采样 | [drivers/adc_measure](main/drivers/adc_measure/README.md)；`adc_measure_init/get()` | ADC1 GPIO3/CH2、GPIO8/CH7；最低连续 DMA 总采样率 611 Hz，每路约 305.5 Hz、31 样本/窗口；校准和 IIR；禁止同时占用 ADC1 oneshot |

@@ -1,8 +1,12 @@
 # PM_Controller 固件
 
+2026-10-19 开机显示：先预置闪光输出低电平，再初始化 ST7789/LVGL 并显示白底黑狗圆角图、逐行启动日志与 `MAC : [出厂MAC]`。狗图上移到 y=48，日志采用 9 px Roboto Mono Medium、20 px 行距和对齐的状态标记。开机图像仅保留 RGB565 小标题与 A8 狗图，其余形状由 LVGL 绘制；启动字体按需导出字符，图像和字形像素比整屏位图版减少约 103.7 KiB，最终固件变化待手动编译确认。随后初始化触发输入输出、按键、测距、存储和 ADC，完成后进入原 UI。可继续启动的失败显示警告，详情见 [开机画面说明](main/app/boot_screen/README.md)。本轮未编译、未测试、未烧录。
+
 2026-10-19：HOME 沿用 v4 布局，当前参考为 v6 双字体版：标题和大距离数字使用 Space Mono Bold，小字、单位及 INFO/SETUP 使用 Roboto Mono。字体取自官方固定版本，两份 OFL 1.1 许可与来源一并保存，详见 [字体许可](THIRD_PARTY_NOTICES.md)。静态文字、标尺、实心指针、右栏图标和相纸图案从设计 SVG 导出；曲线使用内置 `lv_chart`，保留末端圆点，只在 HOME 可见时刷新。首次对焦编辑从当前有效值起步。资源已注册到工程；本轮未修改 SDK 配置，未编译、未测试、未烧录，实屏效果和性能收益待确认。详见 [UI 说明](main/app/ui/README.md)。
 
 当前显示：标题白字，左侧为矩形内五色填充标记；电池整体右移 10 px。距离为 34 px Space Mono，近距 `x.x m`、远距 `xx m`，只简化显示，不修改原始毫米值、指针或曲线。未编译、未上板验证。
+
+2026-10-19 主界面资源精简：追溯到 `448b0f7` 引入的整屏背景与九张胶片条，改为保留原像素的窄条和亮 / 暗单张素材，布局及 0–8 张胶片显示保持。继开机画面优化后，主界面背景与胶片像素再减少 132048 字节（约 129.0 KiB）；所有生成图像和字形像素合计约 67.4 KiB，不含描述表及代码。未修改编译优化、SDK 配置或字体现有外观；本轮未编译、未上板验证。详细统计见 [UI 说明](main/app/ui/README.md)。
 
 2026-10-18：用户确认当前竖屏 UI、三键映射和 ADC 接入版本“测试 OK”，据此保存本地 Git 版本。本轮未代为构建、测试或烧录；ADC 实际采样率、计量精度和其它专项指标未提供量化记录。具体按键功能统一在 [ui.c 的 handle_keys()](main/app/ui/ui.c) 中实现，扫描识别与图标显示分别由 HC165 驱动和 UI 视图负责。
 
@@ -10,7 +14,7 @@
 
 对应 PCB：PM_Controller Rev2.x，当前为 Rev2.0。模组：ESP32-S3-WROOM-1-N8R8，8 MB Flash、8 MB Octal PSRAM。开发环境为 ESP-IDF 6.1。当前 FreeRTOS tick 为 1 kHz（`CONFIG_FREERTOS_HZ=1000`）；按键扫描目标周期 5 ms，EEPROM 忙等待延时为 1 tick。消抖、长按、LVGL 定时与 GPTimer 目标脉宽仍按各自的时间单位配置。
 
-`app_main()` 将闪光输出初始化为低电平，接入 GPIO42 快门下降沿中断，启动 74HC165 按键扫描，加载 24C64 参数，初始化官方 ST7789 驱动和 LVGL，并启动三页竖屏 UI。HOME 使用 KEY1–KEY3 滚动功能列表和执行/调参；INFO/SETUP 使用 KEY1–KEY3 页面导航、背光调节和显式保存。KEY4–KEY6 暂未接入业务。主程序每 1 s 打印测距及 ADC/电源快照。参数修改与持久化提交分开。引脚和双 OTA 分区已整理，电机、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
+`app_main()` 先将闪光输出预置低电平，再完成屏幕和开机画面。随后创建闪光定时器、接入 GPIO42 快门下降沿中断、启动 74HC165 扫描、初始化测距、加载 24C64 参数并启动 ADC，逐阶段追加状态行，最后进入三页 UI。HOME 使用 KEY1–KEY3 滚动功能列表和执行/调参；INFO/SETUP 使用 KEY1–KEY3 页面导航、背光调节和显式保存。KEY4–KEY6 暂未接入业务。主程序每 1 s 打印测距及 ADC/电源快照。参数修改与持久化提交分开。引脚和双 OTA 分区已整理，电机、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
 
 2026-10-07：按用户要求移除本地主机测试、桩及测试缓存，保留固件内的屏幕方向与偏移测试。下文主机测试结果为清理前的验证记录。
 
@@ -38,6 +42,7 @@
 | [main/app/shutter/](main/app/shutter/) | GPIO42 快门下降沿 ISR 直接触发闪光 |
 | [main/app/settings/](main/app/settings/README.md) | 参数定义、RAM 缓存、CRC、轮换保存与旧版导入 |
 | [main/app/display/](main/app/display/) | 官方 esp_lvgl_port 初始化和显示配置 |
+| [main/app/boot_screen/](main/app/boot_screen/) | 狗图、逐行启动状态和出厂 MAC；完成后交给原 UI |
 | [main/app/ui/](main/app/ui/README.md) | CASE 7 竖屏 UI、测距曲线、KEY1–3 菜单及背光设置 |
 | [main/app/focus_distance/](main/app/focus_distance/README.md) | 对焦物距获取接口；当前借用实测距离，等待 FocusUnit 通信和位置标定 |
 | [main/app/power_monitor/](main/app/power_monitor/README.md) | 电池电压、单节锂电池电量估算和 IPROPI 电流换算 |

@@ -1,4 +1,5 @@
 #include "display.h"
+#include "boot_screen.h"
 #include "hc165.h"
 #include "flash_trigger.h"
 #include "ui.h"
@@ -67,18 +68,39 @@ static void log_distance(void)
 void app_main(void)
 {
     ESP_LOGI(TAG, "app_main entered");
+    /* Establish the optocoupler's idle level before the slower LCD reset and
+     * first frame. Full trigger initialization follows the visible boot screen. */
+    ESP_ERROR_CHECK(flash_trigger_prepare_output());
+    lcd_st7789_t lcd = {0};
+    ESP_LOGI(TAG, "lcd_st7789_init begin");
+    lcd_st7789_init(&lcd);
+    ESP_LOGI(TAG, "lcd_st7789_init done");
+    ESP_LOGI(TAG, "display_init begin");
+    lv_display_t *display = display_init(&lcd);
+    ESP_LOGI(TAG, "display_init done");
+    boot_screen_start(display);
+
+    boot_screen_begin(BOOT_STAGE_TRIGGER);
     ESP_LOGI(TAG, "flash_trigger_init begin");
-    ESP_ERROR_CHECK(flash_trigger_init());
+    const esp_err_t flash_result = flash_trigger_init();
+    if (flash_result != ESP_OK) {
+        boot_screen_complete(flash_result);
+        ESP_ERROR_CHECK(flash_result);
+    }
     ESP_LOGI(TAG, "flash_trigger_init done");
 
     ESP_LOGI(TAG, "shutter_init begin");
     shutter_init();
     ESP_LOGI(TAG, "shutter_init done");
+    boot_screen_complete(ESP_OK);
 
+    boot_screen_begin(BOOT_STAGE_KEYS);
     ESP_LOGI(TAG, "hc165_init begin");
     hc165_init();
     ESP_LOGI(TAG, "hc165_init done");
+    boot_screen_complete(ESP_OK);
 
+    boot_screen_begin(BOOT_STAGE_RANGE);
     ESP_LOGI(TAG, "sdm50_init begin");
     esp_err_t range_result = sdm50_init();
     ESP_LOGI(TAG, "sdm50_init returned: %s", esp_err_to_name(range_result));
@@ -91,7 +113,9 @@ void app_main(void)
         ESP_LOGW(TAG, "SDM50 initialization/start failed: %s",
                  esp_err_to_name(range_result));
     }
+    boot_screen_complete(range_result);
 
+    boot_screen_begin(BOOT_STAGE_STORAGE);
     ESP_LOGI(TAG, "settings_init begin");
     const esp_err_t storage_result = settings_init();
     ESP_LOGI(TAG, "settings_init returned: %s", esp_err_to_name(storage_result));
@@ -99,22 +123,17 @@ void app_main(void)
         ESP_LOGW(TAG, "Parameter storage initialization failed: %s",
                  esp_err_to_name(storage_result));
     }
+    boot_screen_complete(storage_result);
 
+    boot_screen_begin(BOOT_STAGE_ADC);
     ESP_LOGI(TAG, "adc_measure_init begin");
     const esp_err_t adc_result = adc_measure_init();
     ESP_LOGI(TAG, "adc_measure_init returned: %s", esp_err_to_name(adc_result));
     if (adc_result != ESP_OK) {
         ESP_LOGW(TAG, "ADC initialization failed: %s", esp_err_to_name(adc_result));
     }
-
-    lcd_st7789_t lcd = {0};
-    ESP_LOGI(TAG, "lcd_st7789_init begin");
-    lcd_st7789_init(&lcd);
-    ESP_LOGI(TAG, "lcd_st7789_init done");
-
-    ESP_LOGI(TAG, "display_init begin");
-    lv_display_t *display = display_init(&lcd);
-    ESP_LOGI(TAG, "display_init done");
+    boot_screen_complete(adc_result);
+    boot_screen_finish();
 
     ESP_LOGI(TAG, "ui_start begin");
     ui_start(display);

@@ -6,8 +6,8 @@ const {chromium}=require(path.join(process.argv[2],'playwright'));
     const browser=await chromium.launch({executablePath:process.argv[3]||'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
     try {
         const page=await browser.newPage({viewport:{width:172,height:320},deviceScaleFactor:1});
-        {
-            const svg=fs.readFileSync(path.join(__dirname,'home.svg'),'utf8');
+        for(const name of ['home','boot']) {
+            const svg=fs.readFileSync(path.join(__dirname,name+'.svg'),'utf8');
             await page.setContent('<style>html,body{margin:0;padding:0;overflow:hidden}svg{display:block}</style>'+svg);
             await page.evaluate(async()=>{
                 for(const font of ['14px "Roboto Mono"','700 34px "Space Mono"']) {
@@ -16,8 +16,8 @@ const {chromium}=require(path.join(process.argv[2],'playwright'));
                 }
                 await document.fonts.ready;
             });
-            await page.screenshot({path:path.join(__dirname,'home.png')});
+            await page.screenshot({path:path.join(__dirname,name+'.png')});
         }
-        console.log('Rendered home.png at 172x320.');
+        console.log('Rendered home.png and boot.png at 172x320.');
     } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

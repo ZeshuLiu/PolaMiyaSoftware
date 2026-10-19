@@ -10,6 +10,9 @@
 #define FLASH_TRIGGER_MAX_US 30000U
 #define FLASH_TRIGGER_RECOVERY_US 1000U
 
+/* Startup only: hold the output low before slow display setup, without enabling
+ * the timer or shutter ISR. Call before flash_trigger_init(). */
+esp_err_t flash_trigger_prepare_output(void);
 /* Initialize at startup before consumers. Initialization never fires a pulse. */
 esp_err_t flash_trigger_init(void);
 

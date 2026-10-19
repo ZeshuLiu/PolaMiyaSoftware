@@ -29,18 +29,23 @@ static bool IRAM_ATTR pulse_done(gptimer_handle_t timer,
     return false;
 }
 
-esp_err_t flash_trigger_init(void)
+esp_err_t flash_trigger_prepare_output(void)
 {
-    if (flash.initialized) {
-        return ESP_OK;
-    }
     gpio_set_level(PIN_FLASH_TRG, 0);
     const gpio_config_t output = {
         .pin_bit_mask = 1ULL << PIN_FLASH_TRG,
         .mode = GPIO_MODE_OUTPUT,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    esp_err_t result = gpio_config(&output);
+    return gpio_config(&output);
+}
+
+esp_err_t flash_trigger_init(void)
+{
+    if (flash.initialized) {
+        return ESP_OK;
+    }
+    esp_err_t result = flash_trigger_prepare_output();
     if (result != ESP_OK) {
         return result;
     }

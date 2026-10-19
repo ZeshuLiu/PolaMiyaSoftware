@@ -229,7 +229,8 @@ void ui_start(lv_display_t *display)
     ui_view_film(film_remaining);
     ui_view_uptime(0);
     ui_view_settings(ui.brightness, false, "");
-    /* Request the initial page before starting the nonblocking backlight fade. */
+    /* Replace the boot screen with the initial page. The backlight is already
+     * on in normal startup; the driver makes that second on request a no-op. */
     lv_refr_now(display);
     lvgl_port_unlock();
     lcd_st7789_backlight(true);

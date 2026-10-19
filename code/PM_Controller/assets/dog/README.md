@@ -1,8 +1,9 @@
 # Joker60 dog image
 
 Extracted from the Joker60_V3.5 keyboard project for reference/reuse in the
-PM_Controller repository. This directory is standalone; the firmware does not
-reference the PNG yet.
+PM_Controller repository. The boot-screen SVG uses `dog.png`; its cropped view
+is exported as a 100 x 48 A8 mask (4800 bytes) for firmware. LVGL draws the
+white rounded card and blends the black mask over it. The original PNG is unchanged.
 
 - Files:
   - `dog.png` — black silhouette on white
@@ -16,4 +17,6 @@ reference the PNG yet.
 - Display use in the source project: `Joker60_V3_5_Code/Composite/Core/Src/freertos.c`
   - `LCD_ShowPicture(0, 10, 240, 91, gImage_DOG);`
 
-The image is kept as an asset only; no source code or build files were changed.
+Current boot design: `UI设计/PortraitUI/boot.svg`, with source viewport
+`(29, 13, 165, 72)` in a `116 x 64` white card with `14 px` corner radius.
+Firmware does not decode the PNG at runtime. `dog_inverted.png` remains a source asset.

@@ -2,6 +2,8 @@
 
 GPIO38 高电平经 R25 驱动 TLP291，默认低电平。`flash_trigger_init()` 在开机时配置 GPIO 并创建、启用 GPTimer；初始化不触发闪光。
 
+2026-10-19：新增启动阶段的 `flash_trigger_prepare_output()`，只预置低电平并配置 GPIO，不创建定时器。主程序在较慢的屏幕初始化前调用它；完整 `flash_trigger_init()` 和快门 ISR 在开机画面显示后初始化。完整初始化仍复用同一输出配置，触发脉冲和恢复时序未改。本轮未编译、未上板验证。
+
 ## 触发与结束
 
 GPIO42 快门触点接地时产生下降沿，由 `app/shutter` 的 GPIO ISR 直接调用 `flash_trigger_fire()`。接口检查忙状态后立即拉高 GPIO38，再设置并启动 1 MHz GPTimer；不创建任务、不发送任务通知、不使用 RMT。定时器报警 ISR 拉低 GPIO38 并停止计数。

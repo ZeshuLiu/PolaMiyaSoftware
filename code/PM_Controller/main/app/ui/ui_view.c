@@ -59,7 +59,7 @@ static struct {
     lv_obj_t *axis_min;
     lv_obj_t *axis_max;
     lv_obj_t *film_count;
-    lv_obj_t *film_strip;
+    lv_obj_t *film_frames[FILM_COUNT];
     int film_remaining;
     lv_obj_t *counts[2];
     lv_obj_t *motor_time;
@@ -193,7 +193,7 @@ static lv_obj_t *create_pointer(lv_obj_t *parent, bool upper)
 
 static void create_distance_scale(lv_obj_t *parent)
 {
-    /* Ticks and labels already belong to ui_home_background. */
+    /* Ticks and labels already belong to the static HOME tiles. */
     view.focus_pointer = create_pointer(parent, true);
     view.actual_pointer = create_pointer(parent, false);
 }
@@ -205,8 +205,13 @@ static void create_film_strip(lv_obj_t *parent)
     lv_obj_set_style_text_color(view.film_count, lv_color_hex(0xdff7e8), 0);
     lv_obj_set_style_text_align(view.film_count, LV_TEXT_ALIGN_RIGHT, 0);
 
-    /* Retains 13.5 px paper, 16.8 px pitch and the filled mountain silhouette. */
-    view.film_strip = image(parent, 12, FILM_FRAME_Y, ui_film_frames[0]);
+    /* Tiles partition the original strip in its blank gaps, retaining each
+     * paper's fractional edges. Row padding is stored but never displayed. */
+    static const int frame_x[FILM_COUNT] = {0, 15, 32, 49, 66, 83, 99, 116};
+    lv_obj_t *strip = plain_object(parent, 12, FILM_FRAME_Y, 132, 19);
+    for (unsigned i = 0; i < FILM_COUNT; ++i) {
+        view.film_frames[i] = image(strip, frame_x[i], 0, ui_film_dim[i]);
+    }
     view.film_remaining = -1;
 }
 
@@ -277,7 +282,9 @@ void ui_view_create(lv_display_t *display)
     lv_obj_t *home = view.pages[UI_HOME] = rectangle(screen, 0, 0, 172, 320, COLOR_BG);
     /* The approved SVG supplies every static label, grid line and separator.
      * Only live values are separate objects; no Windows font is needed on-board. */
-    image(home, 0, 0, &ui_home_background);
+    for (unsigned i = 0; i < sizeof(ui_home_tiles) / sizeof(ui_home_tiles[0]); ++i) {
+        image(home, ui_home_tiles[i].x, ui_home_tiles[i].y, ui_home_tiles[i].image);
+    }
     view.battery_fill = rectangle(home, BATTERY_X + 2, 13, 15, 6, 0xb7e6cb);
     lv_obj_set_style_radius(view.battery_fill, 1, 0);
     view.battery_unknown = label_font(home, BATTERY_X, 8, 19, "?", COLOR_MUTED,
@@ -524,7 +531,12 @@ void ui_view_film(unsigned remaining)
     if (remaining > FILM_COUNT) remaining = FILM_COUNT;
     if ((int)remaining == view.film_remaining) return;
 
-    lv_image_set_src(view.film_strip, ui_film_frames[remaining]);
+    for (unsigned i = 0; i < FILM_COUNT; ++i) {
+        const bool lit = i < remaining;
+        if (view.film_remaining < 0 || lit != (i < (unsigned)view.film_remaining)) {
+            lv_image_set_src(view.film_frames[i], lit ? ui_film_lit[i] : ui_film_dim[i]);
+        }
+    }
     set_text_fmt(view.film_count, "%u", remaining);
     view.film_remaining = (int)remaining;
 }

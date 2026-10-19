@@ -2,6 +2,8 @@
 
 2026-10-19。当前固件资源输入为 [home.svg](home.svg)，结合 Space Mono 与 Roboto Mono。临时方案、对比图及中间生成脚本已清理；原有已跟踪的历史布局和按键基准保留。
 
+新增开机画面：[boot.svg](boot.svg)、[boot.png](boot.png)。白底黑狗位于 (28,48) 的 116×64 px 大圆角矩形，较上一版上移 34 px；下面为 9 px Roboto Mono Medium 逐行启动状态，20 px 行距、右侧状态对齐，淡线分隔日志与底部 MAC。底部显示 `MAC : AA:BB:CC:DD:EE:FF`。图中 MAC 为示例，固件从出厂 eFuse MAC 读取；六个初始化阶段依次显示模块名、点状引导线和 [...] / [OK] / [FAIL]。启动流程见 [boot_screen](../../code/PM_Controller/main/app/boot_screen/README.md)。
+
 ![当前设计预览](home.png)
 
 | 区域 | 字体 | 目的 |
@@ -13,8 +15,10 @@
 
 布局沿用 v4：白色标题、左侧矩形五色标记、右移电池、内置 LVGL 折线图、三键功能及整行胶片。大数字容器为 (12,46)/(83,46)、70×44 px，基线 y=82；单位在小数与整数模式下跟随。显示进位、无效历史断线、圆点隐藏及调参行为保持。
 
+主界面资源不再保存整屏底图：导出器按非背景色的连续行提取 13 个 RGB565 窄条，保留原坐标，空白由页面底色填充。胶片只保存单张亮 / 暗素材并按完全相同的像素去重，8 个位置映射到各自图块，保留小数位置产生的抗锯齿。背景与胶片像素分别由 110080 / 45144 字节降至 14056 / 9120 字节，合计减少约 129.0 KiB；主界面背景和 0–8 张胶片静态重组与原像素一致，设计 SVG 和预览不变。
+
 两种字体均取自官方固定提交，采用 SIL OFL 1.1。字体原文件、版权声明、完整许可和 SHA-256 随项目保存，见 [字体许可](../../code/PM_Controller/THIRD_PARTY_NOTICES.md)。发布源码或固件包时保留两份声明和许可。
 
-维护时直接编辑 `home.svg`。导出固件资源使用 `node export_lvgl_assets.cjs <node_modules路径> [chrome.exe路径]`；更新 `home.png` 使用 `node render_ui.cjs <node_modules路径> [chrome.exe路径]`。脚本依赖 Playwright，导出另需 Sharp；显式加载两种嵌入字体，失败时停止，不回退到系统字体。TTF 不在设备运行时加载，固件使用转换后的字形。
+维护时直接编辑 `home.svg` 或 `boot.svg`，其中 `data-boot-live` 标记的标题、状态行和 MAC 为动态对象，不导入静态图像。开机画面仅保存 (12,8) 的 78×17 RGB565 标题及 (36,56) 的 100×48 A8 狗图蒙版，黑底、白色圆角卡片、小方点和分隔线由 LVGL 绘制。修改这些区域的坐标时同步调整导出裁切与 `boot_screen.c`；新增启动文字时扩充两个启动字号的字符集。导出固件资源使用 `node export_lvgl_assets.cjs <node_modules路径> [chrome.exe路径]`；更新 `home.png` 和 `boot.png` 使用 `node render_ui.cjs <node_modules路径> [chrome.exe路径]`。脚本依赖 Playwright，导出另需 Sharp；显式加载两种嵌入字体，失败时停止，不回退到系统字体。TTF 不在设备运行时加载，固件使用转换后的字形。
 
 已渲染并目视核对小数、整数及调参版本，完成字体来源和源码引用核对。未测试、未编译、未烧录，也未运行 LVGL 模拟器；附图是设计预览，实屏一致性、刷新耗时与固件大小待手动确认。

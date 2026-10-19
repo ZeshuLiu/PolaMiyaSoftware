@@ -12,6 +12,7 @@ idf_component_register(
         "app/shutter/shutter.c"
         "app/settings/settings_record.c"
         "app/display/display.c"
+        "app/boot_screen/boot_screen.c"
         "app/lcd_test/lcd_test.c"
         "app/ui/ui.c"
         "app/ui/ui_view.c"
@@ -30,9 +31,10 @@ idf_component_register(
         "app/settings"
         "app/shutter"
         "app/display"
+        "app/boot_screen"
         "app/lcd_test"
         "app/ui"
         "app/focus_distance"
         "app/power_monitor"
-    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_ledc esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_adc esp_timer freertos esp_rom
+    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_ledc esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_adc esp_timer freertos esp_rom esp_hw_support
 )

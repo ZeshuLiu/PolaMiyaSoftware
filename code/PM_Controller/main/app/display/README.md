@@ -2,6 +2,8 @@
 
 `display_init()` 配置官方 esp_lvgl_port、RGB565、172×64 行内部 DMA 双缓冲，设置 CASE 7 及 gap=(34,0)，背光关闭时清理整个控制器 RAM。官方移植层保留 LVGL 任务、时钟、SPI 刷新和 DMA 完成回调。
 
+2026-10-19：显示初始化前移到大部分外设之前。GPIO38 先预置低电平，随后完成 ST7789/LVGL，并由 [boot_screen](../boot_screen/README.md) 显示狗图、逐行启动状态和出厂 MAC。各模块初始化释放显示锁，最后由原 UI 接管；方向、gap、缓冲与 DMA 回调未改变。本轮未编译、未上板验证。
+
 ## 2026-10-18 看门狗排查
 
 用户报告距离主屏运行时 IDLE1 超时，CPU1 正在执行 taskLVGL。补充堆栈定位于 `lv_line_event → lv_draw_line → lv_draw_sw_line` 的绘制链路；该堆栈不是 SPI 等待现场，尚不能据此确定具体是哪条线或完整故障原因。

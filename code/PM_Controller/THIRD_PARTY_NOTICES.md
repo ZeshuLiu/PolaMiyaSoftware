@@ -8,7 +8,7 @@ Copyright 2015 The Roboto Mono Project Authors (https://github.com/googlefonts/r
 
 Roboto Mono 字体及由其转换的位图字形使用 **SIL Open Font License 1.1**。完整许可见 [OFL.txt](main/app/ui/fonts/RobotoMono/OFL.txt)，来源、固定版本和摘要见 [字体说明](main/app/ui/fonts/RobotoMono/README.md)。发布源码或固件包时同时附带该版权声明与完整许可，不单独出售字体。
 
-当前用于正文、小标签、单位、坐标、胶片计数、运行时间与异常状态文字。
+当前用于正文、小标签、单位、坐标、胶片计数、运行时间、开机阶段及 MAC、异常状态文字。
 
 ## Space Mono
 
