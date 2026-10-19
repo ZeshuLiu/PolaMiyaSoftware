@@ -93,7 +93,7 @@ function font(name, data) {
                 if(['title','desc','defs'].includes(node.localName)) {node.remove();continue;}
                 if(node.localName==='use'||node.querySelector('use')) {node.remove();continue;}
                 if(node.hasAttribute('data-ui-distance')||node.hasAttribute('data-ui-distance-unit')) {node.remove();continue;}
-                if(node.hasAttribute('data-ui-battery-fill')) {node.remove();continue;}
+                if(node.hasAttribute('data-ui-battery-fill')||node.hasAttribute('data-ui-live')) {node.remove();continue;}
                 if(node.localName==='text'&&['2.50','00:12:34','6'].includes(node.textContent)) node.remove();
                 if(node.localName==='rect') {
                     const x=Number(node.getAttribute('x')),y=Number(node.getAttribute('y'));
@@ -184,12 +184,14 @@ function font(name, data) {
         }
         for(const [name,size,weight,lineHeight,baseline,ascii,family] of [
             ['body',14,400,20,4,true,'Roboto Mono'],['small',10,400,16,4,true,'Roboto Mono'],
-            ['distance',34,700,44,8,false,'Space Mono'],['uptime',9.5,500,16,4,false,'Roboto Mono'],
-            ['count',12,600,18,4,false,'Roboto Mono'],['axis',7,400,12,3,false,'Roboto Mono'],
+            ['distance',48,700,56,10,'-.0123456789','Space Mono'],
+            ['distance_status',30,600,40,8,' -AEFINR','Roboto Mono'],['uptime',12,500,18,4,false,'Roboto Mono'],
+            ['unit',16,500,22,5,'m','Roboto Mono'],
+            ['count',14,600,20,4,false,'Roboto Mono'],
             ['boot_label',8,400,12,3,' ./:0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-','Roboto Mono'],
             ['boot_log',9,500,14,3,' .ABCDEFGHIJKLMNOPQRSTUVWXYZ[]','Roboto Mono'],
         ]) {
-            const data=await page.evaluate(({size,weight,lineHeight,baseline,ascii,family})=>{
+            const data=await page.evaluate(({size,weight,lineHeight,baseline,ascii,family,compactDecimal})=>{
                 const canvas=document.createElement('canvas');canvas.width=96;canvas.height=80;
                 const ctx=canvas.getContext('2d',{willReadFrequently:true});
                 ctx.font=`${weight} ${size}px "${family}"`;ctx.textBaseline='alphabetic';ctx.fillStyle='#fff';
@@ -202,10 +204,12 @@ function font(name, data) {
                     for(let y=0;y<80;y++)for(let x=0;x<96;x++)if(rgba[(y*96+x)*4+3]){x1=Math.min(x1,x);x2=Math.max(x2,x);y1=Math.min(y1,y);y2=Math.max(y2,y);}
                     const w=Math.max(0,x2-x1+1),h=Math.max(0,y2-y1+1),index=pixels.length;
                     for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)pixels.push(rgba[(y*96+x)*4+3]);
-                    glyphs.push({cp,index,advance:Math.round(ctx.measureText(ch).width*16),w,h,x:w?x1-16:0,y:h?48-y2-1:0});
+                    const narrowDot=compactDecimal&&ch==='.';
+                    const advance=narrowDot?12*16:compactDecimal?Math.round(ctx.measureText(ch).width)*16:Math.round(ctx.measureText(ch).width*16);
+                    glyphs.push({cp,index,advance,w,h,x:narrowDot?Math.round((12-w)/2):w?x1-16:0,y:h?48-y2-1:0});
                 }
                 return {pixels,glyphs,lineHeight,baseline};
-            },{size,weight,lineHeight,baseline,ascii,family});
+            },{size,weight,lineHeight,baseline,ascii,family,compactDecimal:name==='distance'});
             chunks.push(`/* ${name}: ${family}, ${size} px, weight ${weight}; SIL OFL 1.1. */`);
             font(`ui_font_${name}`,data);
         }

@@ -11,7 +11,8 @@
 #define ICON_X              157
 
 enum { FUNC_SETTINGS, FUNC_FOCUS, FUNC_EJECT, FUNC_INFO, FUNC_COUNT };
-enum { PAGE_GEAR, PAGE_TUNE, PAGE_INFO, PAGE_PLUS, PAGE_DONE, PAGE_MINUS,
+enum { PAGE_GEAR, PAGE_TUNE, PAGE_HOME_TOP, PAGE_HOME_BOTTOM,
+       PAGE_GEAR_TOP, PAGE_INFO_BOTTOM, PAGE_PLUS, PAGE_DONE, PAGE_MINUS,
        PAGE_ICON_COUNT };
 
 typedef struct {
@@ -115,6 +116,18 @@ static lv_obj_t *create_tune(lv_obj_t *screen)
     return group;
 }
 
+static lv_obj_t *create_home(lv_obj_t *screen, int y)
+{
+    lv_obj_t *group = plain_object(screen, ICON_X, y, 14, 14);
+    static const lv_point_precise_t roof[] = {{1, 6}, {7, 1}, {13, 6}};
+    static const lv_point_precise_t walls[] = {
+        {3, 5}, {3, 12}, {6, 12}, {6, 8}, {9, 8}, {9, 12}, {11, 12}, {11, 5},
+    };
+    stroke(group, roof, 3, 1, ICON_COLOR);
+    stroke(group, walls, 8, 1, ICON_COLOR);
+    return group;
+}
+
 static lv_obj_t *create_plus(lv_obj_t *screen)
 {
     lv_obj_t *group = plain_object(screen, ICON_X, 47, 14, 14);
@@ -175,7 +188,12 @@ void ui_key_hints_create(lv_obj_t *screen)
 
     page_icons[PAGE_GEAR] = create_icon_group(screen, ICON_X, 153, 14,
                                               FUNC_SETTINGS);
-    page_icons[PAGE_INFO] = create_icon_group(screen, ICON_X, 153, 14, FUNC_INFO);
+    page_icons[PAGE_HOME_TOP] = create_home(screen, 47);
+    page_icons[PAGE_HOME_BOTTOM] = create_home(screen, 259);
+    page_icons[PAGE_GEAR_TOP] = create_icon_group(screen, ICON_X, 47, 14,
+                                                  FUNC_SETTINGS);
+    page_icons[PAGE_INFO_BOTTOM] = create_icon_group(screen, ICON_X, 259, 14,
+                                                     FUNC_INFO);
     page_icons[PAGE_TUNE] = create_tune(screen);
     page_icons[PAGE_PLUS] = create_plus(screen);
     page_icons[PAGE_DONE] = create_done(screen);
@@ -222,6 +240,9 @@ void ui_key_hints_page(bool setup_page, bool editing)
     if (last_mode == mode) return;
     last_mode = mode;
 
+    show_obj(arrow_up, false);
+    show_obj(arrow_down, false);
+
     for (unsigned i = 0; i < 3; ++i) {
         show_obj(home_slots[i].slot, false);
     }
@@ -231,17 +252,15 @@ void ui_key_hints_page(bool setup_page, bool editing)
 
     if (!setup_page) {
         show_obj(page_icons[PAGE_GEAR], true);
-        show_obj(arrow_up, true);
-        show_obj(arrow_down, true);
+        show_obj(page_icons[PAGE_GEAR_TOP], true);
+        show_obj(page_icons[PAGE_HOME_BOTTOM], true);
     } else if (!editing) {
         show_obj(page_icons[PAGE_TUNE], true);
-        show_obj(arrow_up, true);
-        show_obj(arrow_down, true);
+        show_obj(page_icons[PAGE_HOME_TOP], true);
+        show_obj(page_icons[PAGE_INFO_BOTTOM], true);
     } else {
         show_obj(page_icons[PAGE_PLUS], true);
         show_obj(page_icons[PAGE_DONE], true);
         show_obj(page_icons[PAGE_MINUS], true);
-        show_obj(arrow_up, false);
-        show_obj(arrow_down, false);
     }
 }

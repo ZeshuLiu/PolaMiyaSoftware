@@ -14,7 +14,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define HISTORY_INTERVAL_US 100000LL
 #define FOCUS_STEP_MM 50
 #define FOCUS_MIN_MM 50
 #define FOCUS_MAX_MM 20000
@@ -171,7 +170,6 @@ static void handle_keys(hc165_key_events_t keys)
 static void ui_task(void *argument)
 {
     (void)argument;
-    int64_t history_tick = esp_timer_get_time() / HISTORY_INTERVAL_US;
     while (1) {
         handle_keys(hc165_take_events());
         sdm50_sample_t sample = {.status = SDM50_RX_ERROR};
@@ -194,9 +192,6 @@ static void ui_task(void *argument)
         const bool settings_available = settings_get(&values) == ESP_OK &&
                                         settings_get_status(&status) == ESP_OK;
         const int64_t now = esp_timer_get_time();
-        const int64_t current_tick = now / HISTORY_INTERVAL_US;
-        int64_t elapsed_slots = current_tick - history_tick;
-        if (elapsed_slots > 101) elapsed_slots = 101;
         const bool focus_visible = !ui.focus_editing ||
                                    ((now / FOCUS_BLINK_HALF_US) % 2 == 0);
 
@@ -207,12 +202,6 @@ static void ui_task(void *argument)
         ui_view_range(&focus, &sample);
         ui_view_focus_blink(focus_visible);
         ui_view_power(&power);
-        if (elapsed_slots > 0) {
-            ui_view_history(sample.status == SDM50_VALID ? sample.distance_mm
-                                                        : LV_CHART_POINT_NONE,
-                            (unsigned)elapsed_slots);
-            history_tick = current_tick;
-        }
         ui_view_film(film_remaining);
         ui_view_uptime((uint64_t)(now / 1000000));
         ui_view_info(&values, &status, settings_available);
@@ -223,8 +212,7 @@ static void ui_task(void *argument)
         }
         ui_view_settings(ui.brightness, ui.editing, message);
         lvgl_port_unlock();
-        /* Do not replay missed UI ticks after waiting for a slow render/EEPROM.
-         * History already uses monotonic time and marks missing sample slots. */
+        /* Do not replay missed UI ticks after a slow render or EEPROM write. */
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }

@@ -16,7 +16,6 @@
 #define COLOR_ACTUAL        0x72c9ff
 #define COLOR_GRID          0x1e2e26
 
-#define HISTORY_POINTS      101
 #define FILM_COUNT          8
 #define FILM_FRAME_Y        267
 #define SCALE_ZERO_X        14
@@ -42,22 +41,11 @@ static struct {
     lv_obj_t *motor_values;
     lv_obj_t *number_label[2];
     lv_obj_t *distance_unit[2];
-    bool number_large[2];
     bool unit_visible[2];
     int unit_x[2];
     lv_obj_t *focus_pointer;
     lv_obj_t *actual_pointer;
     lv_obj_t *uptime_value;
-    lv_obj_t *chart;
-    lv_chart_series_t *series;
-    lv_obj_t *chart_endpoint;
-    bool chart_dirty;
-    bool endpoint_visible;
-    int32_t history[HISTORY_POINTS];
-    int32_t chart_min;
-    int32_t chart_max;
-    lv_obj_t *axis_min;
-    lv_obj_t *axis_max;
     lv_obj_t *film_count;
     lv_obj_t *film_frames[FILM_COUNT];
     int film_remaining;
@@ -76,7 +64,7 @@ static struct {
 
 static void set_text(lv_obj_t *obj, const char *value)
 {
-    /* Unchanged text must not restart long-counter scrolling or allocate again. */
+    /* Unchanged text must not invalidate the label or allocate again. */
     if (strcmp(lv_label_get_text(obj), value) != 0) {
         lv_label_set_text(obj, value);
     }
@@ -91,6 +79,19 @@ static void set_text_fmt(lv_obj_t *obj, const char *format, ...)
     vsnprintf(text, sizeof(text), format, arguments);
     va_end(arguments);
     set_text(obj, text);
+}
+
+static void fit_info_value(lv_obj_t *obj)
+{
+    /* A prefixed uint64 counter fits the 132 px row at 10 px. Keep normal
+     * readings at 14 px and retain every digit without scrolling. */
+    const char *text = lv_label_get_text(obj);
+    const lv_font_t *font = lv_text_get_width(text, (uint32_t)strlen(text),
+                                              &ui_font_body, 0) > 132
+                                ? FONT_SMALL : &ui_font_body;
+    if (lv_obj_get_style_text_font(obj, 0) != font) {
+        lv_obj_set_style_text_font(obj, font, 0);
+    }
 }
 
 static lv_obj_t *plain_object(lv_obj_t *parent, int x, int y, int width, int height)
@@ -160,17 +161,16 @@ static lv_obj_t *page(lv_obj_t *screen, const char *title, const char *footer)
 static void create_distance_number(lv_obj_t *parent, unsigned number, int x, int y,
                                     uint32_t color)
 {
-    lv_obj_t *container = plain_object(parent, x, y, 70, 44);
-    view.number_label[number] = label_font(container, 0, 0, 63, "", color,
+    lv_obj_t *container = plain_object(parent, x, y, 132, 56);
+    view.number_label[number] = label_font(container, 0, 0, 132, "", color,
                                            &ui_font_distance);
-    lv_obj_set_height(view.number_label[number], 44);
+    lv_obj_set_height(view.number_label[number], 56);
     lv_label_set_long_mode(view.number_label[number], LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
-    view.number_large[number] = true;
 
-    view.distance_unit[number] = label_font(container, 63, 24, 7, "m",
-                                            number == 0 ? 0x719182 : 0x648696,
-                                            &ui_font_uptime);
-    view.unit_x[number] = 63;
+    view.distance_unit[number] = label_font(container, 0, 29, 10, "m",
+                                            number == 0 ? 0x9ac2aa : 0x8eafc0,
+                                            &ui_font_unit);
+    view.unit_x[number] = 0;
     view.unit_visible[number] = false;
     lv_obj_add_flag(view.distance_unit[number], LV_OBJ_FLAG_HIDDEN);
 }
@@ -187,7 +187,7 @@ static int distance_scale_x(uint32_t distance_mm)
 static lv_obj_t *create_pointer(lv_obj_t *parent, bool upper)
 {
     /* Fractional triangle edges are rasterized from the approved SVG. */
-    return image(parent, SCALE_ZERO_X - 4, upper ? 95 : 114,
+    return image(parent, SCALE_ZERO_X - 4, upper ? 205 : 226,
                  upper ? &ui_pointer_focus : &ui_pointer_actual);
 }
 
@@ -200,7 +200,7 @@ static void create_distance_scale(lv_obj_t *parent)
 
 static void create_film_strip(lv_obj_t *parent)
 {
-    view.film_count = label_font(parent, 120, 244, 24, "0", COLOR_TEXT,
+    view.film_count = label_font(parent, 120, 242, 24, "0", COLOR_TEXT,
                                  &ui_font_count);
     lv_obj_set_style_text_color(view.film_count, lv_color_hex(0xdff7e8), 0);
     lv_obj_set_style_text_align(view.film_count, LV_TEXT_ALIGN_RIGHT, 0);
@@ -213,55 +213,6 @@ static void create_film_strip(lv_obj_t *parent)
         view.film_frames[i] = image(strip, frame_x[i], 0, ui_film_dim[i]);
     }
     view.film_remaining = -1;
-}
-
-static void refresh_history(void)
-{
-    if (!view.chart_dirty) return;
-
-    int32_t low = INT32_MAX;
-    int32_t high = 0;
-    for (unsigned i = 0; i < HISTORY_POINTS; ++i) {
-        const int32_t value = view.history[i];
-        if (value == LV_CHART_POINT_NONE) continue;
-        if (value < low) low = value;
-        if (value > high) high = value;
-    }
-
-    bool range_changed = false;
-    if (low == INT32_MAX) {
-        set_text(view.axis_min, "--");
-        set_text(view.axis_max, "--");
-    } else {
-        low = low / 1000 * 1000;
-        high = (high / 1000 + 1) * 1000;
-        range_changed = low != view.chart_min || high != view.chart_max;
-        if (range_changed) {
-            view.chart_min = low;
-            view.chart_max = high;
-            /* This setter also refreshes the native chart. */
-            lv_chart_set_axis_range(view.chart, LV_CHART_AXIS_PRIMARY_Y, low, high);
-        }
-        set_text_fmt(view.axis_min, "%ld", (long)(low / 1000));
-        set_text_fmt(view.axis_max, "%ld", (long)(high / 1000));
-    }
-    if (!range_changed) lv_chart_refresh(view.chart);
-
-    /* A standard circle object marks only the latest slot, without a custom
-     * drawing callback or point indicators on all 101 history samples. */
-    const bool valid = view.history[HISTORY_POINTS - 1] != LV_CHART_POINT_NONE;
-    if (valid) {
-        lv_point_t point;
-        lv_chart_get_point_pos_by_id(view.chart, view.series, HISTORY_POINTS - 1, &point);
-        lv_obj_set_pos(view.chart_endpoint, lv_obj_get_x(view.chart) + point.x - 1,
-                       lv_obj_get_y(view.chart) + point.y - 1);
-    }
-    if (view.endpoint_visible != valid) {
-        if (valid) lv_obj_remove_flag(view.chart_endpoint, LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_add_flag(view.chart_endpoint, LV_OBJ_FLAG_HIDDEN);
-        view.endpoint_visible = valid;
-    }
-    view.chart_dirty = false;
 }
 
 void ui_view_create(lv_display_t *display)
@@ -292,48 +243,13 @@ void ui_view_create(lv_display_t *display)
     lv_obj_set_style_text_align(view.battery_unknown, LV_TEXT_ALIGN_CENTER, 0);
     ui_view_battery(-1);
 
-    create_distance_number(home, 0, 12, 46, COLOR_ACCENT);
-    create_distance_number(home, 1, 83, 46, COLOR_ACTUAL);
+    create_distance_number(home, 0, 12, 54, COLOR_ACCENT);
+    create_distance_number(home, 1, 12, 138, COLOR_ACTUAL);
     create_distance_scale(home);
-
-    view.axis_max = label_font(home, 17, 166, 16, "--", 0x819b8e, &ui_font_axis);
-    view.axis_min = label_font(home, 17, 206, 16, "--", 0x819b8e, &ui_font_axis);
-    view.chart = lv_chart_create(home);
-    lv_obj_remove_style_all(view.chart);
-    lv_obj_set_pos(view.chart, 32, 170);
-    lv_obj_set_size(view.chart, 110, 44);
-    /* 2 px padding leaves the original (34,172)..(140,212) data rectangle
-     * inside the chart's clip area, including the rightmost/bottom samples. */
-    lv_obj_set_style_pad_all(view.chart, 2, 0);
-    lv_obj_set_style_bg_opa(view.chart, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(view.chart, 0, 0);
-    lv_obj_set_style_line_width(view.chart, 1, LV_PART_ITEMS);
-    lv_obj_set_style_size(view.chart, 0, 0, LV_PART_INDICATOR);
-    lv_obj_remove_flag(view.chart, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    lv_chart_set_type(view.chart, LV_CHART_TYPE_LINE);
-    lv_chart_set_update_mode(view.chart, LV_CHART_UPDATE_MODE_SHIFT);
-    /* Grid lines already belong to the static background. */
-    lv_chart_set_div_line_count(view.chart, 0, 0);
-    lv_chart_set_point_count(view.chart, HISTORY_POINTS);
-    view.series = lv_chart_add_series(view.chart, lv_color_hex(COLOR_ACTUAL),
-                                       LV_CHART_AXIS_PRIMARY_Y);
-    LV_ASSERT_MALLOC(view.series);
-    for (unsigned i = 0; i < HISTORY_POINTS; ++i) {
-        view.history[i] = LV_CHART_POINT_NONE;
-    }
-    lv_chart_set_series_ext_y_array(view.chart, view.series, view.history);
-    view.chart_min = 0;
-    view.chart_max = 1000;
-    lv_chart_set_axis_range(view.chart, LV_CHART_AXIS_PRIMARY_Y, 0, 1000);
-    view.chart_endpoint = rectangle(home, 139, 211, 3, 3, 0xb4e3ff);
-    lv_obj_set_style_radius(view.chart_endpoint, LV_RADIUS_CIRCLE, 0);
-    lv_obj_add_flag(view.chart_endpoint, LV_OBJ_FLAG_HIDDEN);
-    view.endpoint_visible = false;
-    view.chart_dirty = true;
 
     create_film_strip(home);
 
-    view.uptime_value = label_font(home, 80, 295, 64, "00:00:00", 0xd9e8e0,
+    view.uptime_value = label_font(home, 80, 295, 64, "00:00:00", 0xe5eee9,
                                    &ui_font_uptime);
     lv_obj_set_style_text_align(view.uptime_value, LV_TEXT_ALIGN_RIGHT, 0);
 
@@ -342,8 +258,8 @@ void ui_view_create(lv_display_t *display)
     view.battery_values = label(info, 12, 71, 132, "-- V / -- %", COLOR_TEXT);
     label(info, 12, 100, 132, "MOTOR / IPROPI", COLOR_MUTED);
     view.motor_values = label(info, 12, 120, 132, "-- mA / -- mV", COLOR_TEXT);
-    lv_label_set_long_mode(view.battery_values, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
-    lv_label_set_long_mode(view.motor_values, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+    lv_label_set_long_mode(view.battery_values, LV_LABEL_LONG_MODE_CLIP);
+    lv_label_set_long_mode(view.motor_values, LV_LABEL_LONG_MODE_CLIP);
     lv_obj_set_height(view.battery_values, 18);
     lv_obj_set_height(view.motor_values, 18);
     label(info, 12, 149, 132, "REBOOTS / SHOTS", COLOR_MUTED);
@@ -352,10 +268,10 @@ void ui_view_create(lv_display_t *display)
     label(info, 12, 218, 132, "MOTOR TOTAL", COLOR_MUTED);
     view.motor_time = label(info, 12, 238, 132, "--", COLOR_TEXT);
     for (unsigned i = 0; i < 2; ++i) {
-        lv_label_set_long_mode(view.counts[i], LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+        lv_label_set_long_mode(view.counts[i], LV_LABEL_LONG_MODE_CLIP);
         lv_obj_set_height(view.counts[i], 18);
     }
-    lv_label_set_long_mode(view.motor_time, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+    lv_label_set_long_mode(view.motor_time, LV_LABEL_LONG_MODE_CLIP);
     lv_obj_set_height(view.motor_time, 18);
     view.storage = label(info, 12, 270, 132, "EEPROM --", COLOR_MUTED);
 
@@ -388,14 +304,13 @@ void ui_view_show(unsigned page_index)
             lv_obj_add_flag(view.pages[i], LV_OBJ_FLAG_HIDDEN);
         }
     }
-    if (page_index == UI_HOME) refresh_history();
 }
 
 void ui_view_key_hints(unsigned page_index, unsigned home_func,
-                       bool focus_editing, bool setup_editing)
+                       bool home_selected, bool setup_editing)
 {
     if (page_index == UI_HOME) {
-        ui_key_hints_home(home_func, focus_editing);
+        ui_key_hints_home(home_func, home_selected);
     } else {
         ui_key_hints_page(page_index == UI_SETUP, setup_editing);
     }
@@ -444,20 +359,27 @@ void ui_view_power(const power_sample_t *sample)
     } else {
         set_text(view.motor_values, "-- mA / -- mV");
     }
+    fit_info_value(view.battery_values);
+    fit_info_value(view.motor_values);
 }
 
 static void set_distance_number(unsigned number, ui_distance_state_t state, uint32_t mm)
 {
     const bool valid = state == UI_DISTANCE_FINITE;
+    const uint64_t hundredths = ((uint64_t)mm + 5) / 10;
+    const bool submeter = valid && hundredths < 100;
     const uint64_t tenths = ((uint64_t)mm + 50) / 100;
     const bool fractional = valid && tenths < 100;
     const unsigned value = (unsigned)(fractional ? tenths : ((uint64_t)mm + 500) / 1000);
     const bool large = valid && value <= 99;
-    if (view.number_large[number] != large) {
+    const lv_font_t *font = large ? &ui_font_distance :
+                              valid ? &ui_font_body : &ui_font_distance_status;
+    if (lv_obj_get_style_text_font(view.number_label[number], 0) != font) {
         lv_obj_set_style_text_font(view.number_label[number],
-                                   large ? &ui_font_distance : &ui_font_body, 0);
-        lv_obj_set_y(view.number_label[number], large ? 0 : 11);
-        view.number_large[number] = large;
+                                   font, 0);
+        lv_obj_set_y(view.number_label[number], large ? 0 : valid ? 30 : 8);
+        lv_obj_set_style_text_align(view.number_label[number],
+                                    valid ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER, 0);
     }
 
     if (state == UI_DISTANCE_INFINITY) {
@@ -469,18 +391,30 @@ static void set_distance_number(unsigned number, ui_distance_state_t state, uint
     } else if (!large) {
         /* Future values above two integer digits keep the complete value. */
         set_text_fmt(view.number_label[number], "%u m", value);
+    } else if (submeter) {
+        set_text_fmt(view.number_label[number], ".%02u", (unsigned)hundredths);
     } else if (fractional) {
         set_text_fmt(view.number_label[number], "%u.%u", value / 10, value % 10);
     } else {
         set_text_fmt(view.number_label[number], "%u", value);
     }
 
+    int number_x = 0;
     if (large) {
-        const int unit_x = fractional ? 63 : 43;
+        /* Space Mono digits keep equal widths; the decimal has a separately
+         * narrowed advance. Center number, 6 px gap and the 10 px unit. */
+        const char *text = lv_label_get_text(view.number_label[number]);
+        const int width = lv_text_get_width(text, (uint32_t)strlen(text), font, 0);
+        number_x = (132 - (width + 6 + 10) + 1) / 2;
+        const int unit_x = number_x + width + 6;
         if (view.unit_x[number] != unit_x) {
             lv_obj_set_x(view.distance_unit[number], unit_x);
             view.unit_x[number] = unit_x;
         }
+    }
+    if (lv_obj_get_x(view.number_label[number]) != number_x) {
+        lv_obj_set_x(view.number_label[number], number_x);
+        lv_obj_set_width(view.number_label[number], 132 - number_x);
     }
     if (view.unit_visible[number] != large) {
         if (large) lv_obj_remove_flag(view.distance_unit[number], LV_OBJ_FLAG_HIDDEN);
@@ -541,21 +475,6 @@ void ui_view_film(unsigned remaining)
     view.film_remaining = (int)remaining;
 }
 
-void ui_view_history(int32_t distance_mm, unsigned elapsed_slots)
-{
-    if (elapsed_slots > HISTORY_POINTS) {
-        elapsed_slots = HISTORY_POINTS;
-    }
-    memmove(view.history, view.history + elapsed_slots,
-            (HISTORY_POINTS - elapsed_slots) * sizeof(view.history[0]));
-    for (unsigned i = HISTORY_POINTS - elapsed_slots; i < HISTORY_POINTS; ++i) {
-        view.history[i] = LV_CHART_POINT_NONE;
-    }
-    view.history[HISTORY_POINTS - 1] = distance_mm;
-    view.chart_dirty = true;
-    if (view.page == UI_HOME) refresh_history();
-}
-
 void ui_view_uptime(uint64_t seconds)
 {
     if (view.page != UI_HOME) return;
@@ -575,12 +494,15 @@ void ui_view_info(const settings_values_t *values, const settings_status_t *stat
         set_text(view.storage, "EEPROM ERROR");
         return;
     }
-    /* Preserve exact persisted counters; overflow scrolls within its own row. */
+    /* Preserve exact persisted counters in fixed, non-scrolling rows. */
     set_text_fmt(view.counts[0], "R %" PRIu64, values->reboot_count);
     set_text_fmt(view.counts[1], "S %" PRIu64, values->shutter_count);
     const uint64_t minutes = values->motor_run_ms / 60000;
     set_text_fmt(view.motor_time, "%" PRIu64 "h %02u m",
                  minutes / 60, (unsigned)(minutes % 60));
+    fit_info_value(view.counts[0]);
+    fit_info_value(view.counts[1]);
+    fit_info_value(view.motor_time);
     set_text(view.storage, !status->writable ? "EEPROM ERROR" :
                       status->dirty ? "RAM UNSAVED" :
                       status->loaded_from_eeprom ? "EEPROM OK" : "RAM DEFAULTS");

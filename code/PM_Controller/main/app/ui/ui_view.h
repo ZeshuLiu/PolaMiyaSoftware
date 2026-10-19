@@ -29,13 +29,12 @@ void ui_view_range(const focus_distance_t *focus, const sdm50_sample_t *actual);
 void ui_view_focus_blink(bool visible);
 /* 0..8 remaining instant-film shots. Values above 8 are clamped. */
 void ui_view_film(unsigned remaining);
-void ui_view_history(int32_t distance_mm, unsigned elapsed_slots);
 void ui_view_uptime(uint64_t seconds);
 void ui_view_info(const settings_values_t *values, const settings_status_t *status,
                   bool available);
 void ui_view_settings(unsigned percent, bool editing, const char *message);
 /* Update the right-hand key hints for HOME or the INFO/SETUP pages. */
-void ui_view_key_hints(unsigned page, unsigned home_func, bool focus_editing,
+void ui_view_key_hints(unsigned page, unsigned home_func, bool home_selected,
                        bool setup_editing);
 
 #endif

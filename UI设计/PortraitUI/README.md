@@ -1,24 +1,28 @@
 # 当前竖屏 UI
 
-2026-10-19。当前固件资源输入为 [home.svg](home.svg)，结合 Space Mono 与 Roboto Mono。临时方案、对比图及中间生成脚本已清理；原有已跟踪的历史布局和按键基准保留。
+2026-10-19。HOME 取消时域曲线，改为上下两块距离读数；右侧栏沿用原位置、图标和按键逻辑。设计输入为 [home.svg](home.svg)，预览为 [home.png](home.png)。
 
-新增开机画面：[boot.svg](boot.svg)、[boot.png](boot.png)。白底黑狗位于 (28,48) 的 116×64 px 大圆角矩形，较上一版上移 34 px；下面为 9 px Roboto Mono Medium 逐行启动状态，20 px 行距、右侧状态对齐，淡线分隔日志与底部 MAC。底部显示 `MAC : AA:BB:CC:DD:EE:FF`。图中 MAC 为示例，固件从出厂 eFuse MAC 读取；六个初始化阶段依次显示模块名、点状引导线和 [...] / [OK] / [FAIL]。启动流程见 [boot_screen](../../code/PM_Controller/main/app/boot_screen/README.md)。
+![当前 HOME](home.png)
 
-![当前设计预览](home.png)
-
-| 区域 | 字体 | 目的 |
+| 区域 | 字体 / 坐标 | 说明 |
 | --- | --- | --- |
-| PolaMiya 标题 | Space Mono Bold，12.4 px | 保留白色，强化品牌与设备感 |
-| 对焦 / 实测大数字 | Space Mono Bold，34 px | 突出关键读数，继续使用 `x.x m` / `xx m` |
-| 单位、小标签、刻度、纵轴、胶片数量与运行时间 | Roboto Mono，按原设计字号 | 保持小字号清晰和数字排列整齐 |
-| INFO / SETUP、INF / NEAR / 无效值、电量问号 | Roboto Mono，正文 14 px、问号 10 px | 长文字和异常提示沿用统一正文体系 |
+| 顶部 | 五色标记 (12,9)、电池 (131,11) | 不显示 PolaMiya 文字 |
+| FOCUS / ACTUAL | Roboto Mono 14 px，基线 47/131 | 上对焦、下实测 |
+| 距离数值 | Space Mono Bold 48 px，基线 100/184 | 数字步距 29 px；小数点步距 12 px，位图在格内居中 |
+| m 单位 | Roboto Mono 16 px | 跟随数值，间隔 6 px；整组在 132 px 宽区域居中 |
+| INF / NEAR / 横杠 | Roboto Mono 30 px | 居中，不显示单位 |
+| 即时距离标尺 | 水平线 y=218.5，标签基线 243 | 对数有限轴 0–20 m，独立 INF，双指针对应两组读数 |
+| FILM | 标签与数量基线 258，相纸 y=267–286 | 8 张相纸，当前示例为 6 张 |
+| UPTIME | Roboto Mono 12 px，基线 309 | 本次运行时间 |
 
-布局沿用 v4：白色标题、左侧矩形五色标记、右移电池、内置 LVGL 折线图、三键功能及整行胶片。大数字容器为 (12,46)/(83,46)、70×44 px，基线 y=82；单位在小数与整数模式下跟随。显示进位、无效历史断线、圆点隐藏及调参行为保持。
+数值保持 `.xxm` / 一位小数 / 整数米格式；小数点不占完整数字格。代码中的控件坐标、字形指标与预览一致，移除了 lv_chart、101 点历史缓存和定时采样接口。
 
-主界面资源不再保存整屏底图：导出器按非背景色的连续行提取 13 个 RGB565 窄条，保留原坐标，空白由页面底色填充。胶片只保存单张亮 / 暗素材并按完全相同的像素去重，8 个位置映射到各自图块，保留小数位置产生的抗锯齿。背景与胶片像素分别由 110080 / 45144 字节降至 14056 / 9120 字节，合计减少约 129.0 KiB；主界面背景和 0–8 张胶片静态重组与原像素一致，设计 SVG 和预览不变。
+侧栏宽 17 px、x=155，背景 y=20–299；分隔线 y=84/236，KEY3/KEY2/KEY1 图标中心 y=54/160/266。HOME 功能轮换为 SETTINGS → FOCUS → EJECT → INFO，浏览时显示上一项、当前项和下一项。EJECT 启停仍使用 1 s 硬件斜坡，选中时隐藏上下导航箭头。
 
-两种字体均取自官方固定提交，采用 SIL OFL 1.1。字体原文件、版权声明、完整许可和 SHA-256 随项目保存，见 [字体许可](../../code/PM_Controller/THIRD_PARTY_NOTICES.md)。发布源码或固件包时保留两份声明和许可。
+静态背景由导出器提取为 10 个 RGB565 窄条；侧栏、指针和亮暗相纸单独保存，不新增整屏缓冲。SVG 的 data-ui-distance、data-ui-distance-unit、data-ui-battery-fill 和 data-ui-live 标记对象属于动态预览，不进入静态图块。
 
-维护时直接编辑 `home.svg` 或 `boot.svg`，其中 `data-boot-live` 标记的标题、状态行和 MAC 为动态对象，不导入静态图像。开机画面仅保存 (12,8) 的 78×17 RGB565 标题及 (36,56) 的 100×48 A8 狗图蒙版，黑底、白色圆角卡片、小方点和分隔线由 LVGL 绘制。修改这些区域的坐标时同步调整导出裁切与 `boot_screen.c`；新增启动文字时扩充两个启动字号的字符集。导出固件资源使用 `node export_lvgl_assets.cjs <node_modules路径> [chrome.exe路径]`；更新 `home.png` 和 `boot.png` 使用 `node render_ui.cjs <node_modules路径> [chrome.exe路径]`。脚本依赖 Playwright，导出另需 Sharp；显式加载两种嵌入字体，失败时停止，不回退到系统字体。TTF 不在设备运行时加载，固件使用转换后的字形。
+开机画面为 [boot.svg](boot.svg)、[boot.png](boot.png)，本轮保留原样：白底黑狗、9 px 初始化日志和出厂 MAC。业务及启动细节见 [UI 模块](../../code/PM_Controller/main/app/ui/README.md) 和 [开机画面](../../code/PM_Controller/main/app/boot_screen/README.md)。
 
-已渲染并目视核对小数、整数及调参版本，完成字体来源和源码引用核对。未测试、未编译、未烧录，也未运行 LVGL 模拟器；附图是设计预览，实屏一致性、刷新耗时与固件大小待手动确认。
+维护时编辑 SVG，再运行 `node export_lvgl_assets.cjs <node_modules路径> [chrome.exe路径]` 生成固件资源，用 `node render_ui.cjs <node_modules路径> [chrome.exe路径]` 更新 PNG。前者依赖 Playwright / Sharp，后者依赖 Playwright。字体只取仓库内固定版本，禁止系统字体回退；两份 OFL 1.1 许可及来源一并保留，见 [字体许可](../../code/PM_Controller/THIRD_PARTY_NOTICES.md)。
+
+本轮已核对小数、整数及 INF 设计预览；未编译、测试、运行 LVGL 模拟器或烧录，实屏效果与性能待确认。历史布局和按键基准文件保留。

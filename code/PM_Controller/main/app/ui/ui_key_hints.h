@@ -9,7 +9,7 @@
 void ui_key_hints_create(lv_obj_t *screen);
 /* HOME: three-icon rolling function list. current follows UI_HOME_FUNC_*. */
 void ui_key_hints_home(unsigned current, bool editing);
-/* INFO/SETUP: up/down page arrows plus the current page action. */
+/* INFO/SETUP: destination icons; brightness editing uses plus/done/minus. */
 void ui_key_hints_page(bool setup_page, bool editing);
 
 #endif
