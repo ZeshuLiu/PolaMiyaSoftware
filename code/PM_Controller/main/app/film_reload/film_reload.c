@@ -8,7 +8,7 @@
 #include "freertos/task.h"
 
 #define FILM_RELOAD_POLL_MS       1000
-#define FILM_RELOAD_WAIT_MS       10000
+#define FILM_RELOAD_WAIT_MS       1000
 #define FILM_RELOAD_CAPACITY      8
 #define FILM_RELOAD_STACK_BYTES   3072
 #define FILM_RELOAD_PRIORITY      1
@@ -23,7 +23,7 @@ static void film_reload_task(void *argument)
     while (1) {
         const int64_t now = esp_timer_get_time();
         if (clear_after_us == 0 && film_latch_pending()) {
-            ESP_LOGI(TAG, "FILM_KEY latched; acknowledge in about 10 s");
+            ESP_LOGI(TAG, "FILM_KEY latched; acknowledge in about 1 s");
             clear_after_us = now + (int64_t)FILM_RELOAD_WAIT_MS * 1000;
         } else if (clear_after_us != 0 && now >= clear_after_us) {
             const esp_err_t result = film_latch_clear();

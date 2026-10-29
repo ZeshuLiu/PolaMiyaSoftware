@@ -39,7 +39,12 @@ void FocusEncoder_Update(uint32_t now_ms)
 /* 清软件位置并重取 CNT 基准，硬件计数器继续工作。 */
 void FocusEncoder_Zero(void)
 {
-  measurement.position = 0;
+  FocusEncoder_SetPosition(0);
+}
+
+void FocusEncoder_SetPosition(int32_t position)
+{
+  measurement.position = position;
   measurement.delta = 0;
   measurement.direction = 0;
   previous_counter = (uint16_t)__HAL_TIM_GET_COUNTER(encoder_timer);

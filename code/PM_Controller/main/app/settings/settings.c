@@ -216,6 +216,17 @@ esp_err_t settings_commit(void)
     return result;
 }
 
+esp_err_t settings_commit_shutter(void)
+{
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    settings_values_t values = store.persisted_values;
+    values.shutter_count = store.values.shutter_count;
+    const esp_err_t result = commit_values_locked(&values);
+    xSemaphoreGive(store.mutex);
+    return result;
+}
+
 static esp_err_t commit_film_locked(void)
 {
     settings_values_t values = store.persisted_values;

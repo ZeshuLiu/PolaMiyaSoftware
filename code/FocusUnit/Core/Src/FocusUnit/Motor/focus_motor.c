@@ -297,8 +297,8 @@ static void step_home(uint32_t now_ms)
             FocusMotor_GlideMonitorStart(now_ms);
             s_glide_active = 1U;
         }
-        write_drive(s_direction, FOCUS_MOTOR_GLIDE_DUTY_PERMILLE);
-        publish_snapshot(FOCUS_MOTOR_GLIDE_DUTY_PERMILLE);
+        write_drive(s_direction, FOCUS_MOTOR_HOME_GLIDE_DUTY_PERMILLE);
+        publish_snapshot(FOCUS_MOTOR_HOME_GLIDE_DUTY_PERMILLE);
     } else if (home_command.mode == FOCUS_MOTOR_MODE_OPEN_LOOP) {
         select_open_loop(home_command.output.direction, home_command.output.duty_permille);
         step_open_loop();
@@ -312,7 +312,7 @@ static void step_home(uint32_t now_ms)
     }
 }
 
-/* 上电延时后寻零，完成后制动；后续按命令推进运动。 */
+/* 寻零成功后触底位置设为 -500，再定位到 0；后续按命令推进运动。 */
 void FocusMotor_Step(uint32_t now_ms)
 {
     const FocusMotor_HomeStatus *home = FocusMotor_HomeGetStatus();
@@ -326,9 +326,9 @@ void FocusMotor_Step(uint32_t now_ms)
     }
     if (home->work_state == FOCUS_MOTOR_WORK_INITIALIZING) {
         step_home(now_ms);
-        if ((s_boot_phase == BOOT_HOME) &&
-            (home->work_state == FOCUS_MOTOR_WORK_NORMAL) && (home->zero_valid != 0U)) {
+        if ((home->work_state == FOCUS_MOTOR_WORK_NORMAL) && (home->zero_valid != 0U)) {
             s_boot_phase = BOOT_DONE;
+            (void)FocusMotor_MoveRaw(0);
         }
         return;
     }

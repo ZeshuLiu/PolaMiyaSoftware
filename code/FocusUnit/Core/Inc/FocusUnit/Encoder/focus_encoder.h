@@ -22,6 +22,8 @@ HAL_StatusTypeDef FocusEncoder_Init(TIM_HandleTypeDef *htim, uint32_t now_ms);
 void FocusEncoder_Update(uint32_t now_ms);
 /* 清累计位置并重取 CNT 为基准。 */
 void FocusEncoder_Zero(void);
+/* 指定当前位置并重取 CNT 为基准，仅在主循环调用。 */
+void FocusEncoder_SetPosition(int32_t position);
 /* 设置方向映射，保留已累计位置。 */
 void FocusEncoder_SetSign(int8_t sign);
 /* 复制主循环中的最近结果。 */

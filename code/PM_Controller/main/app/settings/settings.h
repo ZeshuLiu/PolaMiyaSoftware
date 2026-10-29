@@ -39,6 +39,8 @@ esp_err_t settings_get_status(settings_status_t *status);
 esp_err_t settings_set(settings_key_t key, uint64_t value);
 esp_err_t settings_increment(settings_key_t key, uint64_t amount);
 esp_err_t settings_commit(void);
+/* Persist only shutter_count; leave other uncommitted RAM parameters untouched. */
+esp_err_t settings_commit_shutter(void);
 /* Persist only film_remaining; leave other uncommitted RAM parameters untouched. */
 esp_err_t settings_commit_film(void);
 /* Saturating one-shot decrement and film-only save under the same parameter lock.

@@ -37,6 +37,7 @@ typedef enum {
 static struct {
     lv_obj_t *pages[UI_PAGE_COUNT];
     ui_battery_t battery;
+    lv_obj_t *battery_percent;
     lv_obj_t *battery_values;
     lv_obj_t *motor_values;
     lv_obj_t *number_label[2];
@@ -241,6 +242,8 @@ void ui_view_create(lv_display_t *display)
     ui_battery_create(&view.battery, home);
     lv_obj_set_x(lv_obj_get_parent(view.battery.frame), 136);
     lv_obj_set_style_bg_color(lv_obj_get_parent(view.battery.frame), lv_color_hex(COLOR_BG), 0);
+    view.battery_percent = label_font(home, 94, 8, 40, "--%", COLOR_MUTED, FONT_SMALL);
+    lv_obj_set_style_text_align(view.battery_percent, LV_TEXT_ALIGN_RIGHT, 0);
 
     view.focus_card = rectangle(home, 8, 130, 120, 85, COLOR_ACCENT);
     lv_obj_set_style_radius(view.focus_card, 4, 0);
@@ -333,7 +336,15 @@ void ui_view_eject(uint64_t elapsed_ms, const power_sample_t *sample)
 
 void ui_view_power(const power_sample_t *sample, battery_status_t battery, uint32_t now_ms)
 {
-    if (view.page == UI_HOME) ui_battery_update(&view.battery, battery, sample->battery_percent, now_ms);
+    if (view.page == UI_HOME) {
+        ui_battery_update(&view.battery, battery, sample->battery_percent, now_ms);
+        if (sample->battery_valid && sample->battery_percent >= 0 &&
+            battery != BATTERY_ABSENT && battery != BATTERY_PENDING) {
+            set_text_fmt(view.battery_percent, "%d%%", sample->battery_percent);
+        } else {
+            set_text(view.battery_percent, "--%");
+        }
+    }
     else if (view.page == UI_EJECT) ui_eject_battery(battery, sample->battery_percent, now_ms);
     if (view.page != UI_INFO) return;
     if (battery == BATTERY_ABSENT) {

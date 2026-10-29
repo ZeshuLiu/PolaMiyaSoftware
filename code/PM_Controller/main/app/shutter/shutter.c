@@ -4,14 +4,45 @@
 #include "flash_trigger.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+
+#define SHUTTER_HOLDOFF_US 1000000LL
+
+static portMUX_TYPE count_lock = portMUX_INITIALIZER_UNLOCKED;
+static uint64_t pending_edges;
+static int64_t last_trigger_us;
+static bool triggered;
 
 static const char *TAG = "shutter";
 
 static void shutter_edge(void *context)
 {
     (void)context;
-    /* No logging, queueing or persistence in the trigger path. Busy edges drop. */
+    const int64_t now = esp_timer_get_time();
+    portENTER_CRITICAL_ISR(&count_lock);
+    const bool accepted = !triggered || now - last_trigger_us >= SHUTTER_HOLDOFF_US;
+    if (accepted) {
+        triggered = true;
+        last_trigger_us = now;
+    }
+    portEXIT_CRITICAL_ISR(&count_lock);
+    if (!accepted) return;
+
+    /* Trigger immediately, then count the accepted edge even if flash is busy. */
     (void)flash_trigger_fire();
+    portENTER_CRITICAL_ISR(&count_lock);
+    if (pending_edges < UINT64_MAX) ++pending_edges;
+    portEXIT_CRITICAL_ISR(&count_lock);
+}
+
+uint64_t shutter_take_count(void)
+{
+    portENTER_CRITICAL(&count_lock);
+    const uint64_t count = pending_edges;
+    pending_edges = 0;
+    portEXIT_CRITICAL(&count_lock);
+    return count;
 }
 
 void shutter_init(void)

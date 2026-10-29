@@ -5,14 +5,16 @@
 #include <stdint.h>
 
 #define FOCUS_MOTOR_GLIDE_DUTY_PERMILLE 700U
+#define FOCUS_MOTOR_HOME_GLIDE_DUTY_PERMILLE 800U
 /* 定位参数均为暂定值，需实机调整。 */
 #define FOCUS_MOTOR_MOVE_TOLERANCE_COUNTS 50
 #define FOCUS_MOTOR_MOVE_DUTY_PERMILLE 800U
 #define FOCUS_MOTOR_MOVE_SETTLE_MS 1000U
-#define FOCUS_MOTOR_STALL_RAW_THRESHOLD 1700U
+#define FOCUS_MOTOR_STALL_RAW_THRESHOLD 2000U
 #define FOCUS_MOTOR_MOVE_STALL_FRAMES 3U
 /* 寻零允差为编码器四倍频计数；严格小于才有效。首次触底也计入次数。 */
 #define FOCUS_MOTOR_HOME_DIRECTION FOCUS_MOTOR_DIR_B
+#define FOCUS_MOTOR_HOME_CONTACT_POSITION (-500)
 #define FOCUS_MOTOR_HOME_TOLERANCE_COUNTS 50
 #define FOCUS_MOTOR_HOME_MAX_ATTEMPTS 5U
 #define FOCUS_MOTOR_HOME_BACKOFF_DUTY_PERMILLE 700U
@@ -77,7 +79,7 @@ typedef struct {
 extern FocusMotor_Config FocusMotor_ConfigData;
 extern volatile FocusMotor_Snapshot FocusMotor_State;
 
-/* 初始化输出并制动；调度器启动 700 ms 后自动寻零，成功后制动等待指令。
+/* 初始化输出并制动；调度器启动 700 ms 后自动寻零，成功后定位到 0 RAW。
  * 主循环仅在调度器 10 ms 电机任务中调用 Step。
  * now_ms 传给启动等待及寻零流程，PWM 输出层不保存时间戳。 */
 HAL_StatusTypeDef FocusMotor_Init(TIM_HandleTypeDef *htim);

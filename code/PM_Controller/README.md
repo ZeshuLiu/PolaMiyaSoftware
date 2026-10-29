@@ -4,9 +4,9 @@
 
 2026-10-20 相纸余量：新增 EEPROM 参数 ID 5（0–8），开机读取保存值，旧记录缺项默认 6。FILM_KEY 延时恢复成功后设为 8 并保存；每次吐片从首次启动到最终停止斜坡目标结束严格超过 5 s 时扣 1 张，最低 0，完成后写 EEPROM。中途反向切换仍视为同一次动作。相纸自动保存只提交此字段，不保存尚未确认的背光修改；失败由低优先级任务每秒重试当前值，不重复扣减。保留记录格式、CRC 和轮换机制，未编译、测试或烧录，实机未验证。
 
-2026-10-20 FILM_KEY：新增优先级 1 的低优先级任务，每秒读取 GPIO6，发现事件后等待约 10 s；GPIO7 发出至少 100 ms 高脉冲恢复锁存，读回成功后将剩余相纸设为 8。初始化不清除旧事件；失败记录日志，余量不变，并继续轮询重试。任务通过参数服务更新并保存相纸数量，UI 线程负责显示；不控制吐片电机。GPIO 驱动及应用分别见 [film_latch](main/drivers/film_latch/README.md) / [film_reload](main/app/film_reload/README.md)。未编译、测试或烧录，实机未验证。
+FILM_KEY：优先级 1 的低优先级任务每秒读取 GPIO6，发现事件后等待约 1 s；GPIO7 发出至少 100 ms 高脉冲恢复锁存，读回成功后将剩余相纸设为 8。初始化不清除旧事件；失败记录日志，余量不变，并继续轮询重试。任务通过参数服务更新并保存相纸数量，UI 线程负责显示；不控制吐片电机。GPIO 驱动及应用分别见 [film_latch](main/drivers/film_latch/README.md) / [film_reload](main/app/film_reload/README.md)。未编译、测试或烧录，实机未验证。
 
-2026-10-20 统计修正：重启计数此前只有参数字段和 INFO 显示，没有递增调用；现由 `app_main()` 在参数加载成功后加 1 并提交一次。加载失败不累计或写入，提交失败保留 RAM 增量供显式保存重试。`settings_init()` 保持只读，EEPROM 布局不变。INFO 电机累计工作时长改为整秒加 `s` 显示，存储仍为毫秒；电机时长和快门计数的业务累计尚未接入。未编译、测试或烧录，实机未验证。
+统计：重启计数由 `app_main()` 在参数加载成功后加 1 并提交一次。快门首次下降沿立即触发并计数，随后 1 s 内抑制；主任务约每秒更新计数并单独保存，失败时重试。`settings_init()` 保持只读，EEPROM 布局不变。INFO 电机累计工作时长按整秒加 `s` 显示，存储仍为毫秒；电机时长的业务累计尚未接入。未编译、测试或烧录，实机未验证。
 
 2026-10-20：EJECT 已改为独立页面，启动成功后隐藏 HOME，显示绿色主体、黑色顶栏、本次吐片计时和实时电流圆环。小于 1 A 显示 `.xxx`，底部为放大的循环吐片动画，无 EJECTING / PRESS TO STOP。2026-10-25 已取消页面渐变：启动成功直接进入，停止成功直接返回 HOME；电机仍保留 1 s 启停斜坡，相纸在停止斜坡目标结束后结算；上下键不操作。只刷新当前页，沿用 50 ms UI 周期，无新任务、GIF 或整屏位图；SDK 配置和电机驱动未改动。源码、资源及设计预览已更新，未编译、测试或烧录，实屏未验证。详见 [UI 说明](main/app/ui/README.md)。
 
@@ -55,7 +55,7 @@
 | [main/drivers/adc_measure/](main/drivers/adc_measure/README.md) | ADC1 最低速连续 DMA、两路校准与滤波快照 |
 | [main/app/shutter/](main/app/shutter/) | GPIO42 快门下降沿 ISR 直接触发闪光 |
 | [main/drivers/film_latch/](main/drivers/film_latch/README.md) | FILM_KEY 锁存输入、恢复脉冲及读回确认 |
-| [main/app/film_reload/](main/app/film_reload/README.md) | 优先级 1、约 10 s 后恢复锁存并把相纸余量设为 8 |
+| [main/app/film_reload/](main/app/film_reload/README.md) | 优先级 1、约 1 s 后恢复锁存并把相纸余量设为 8 |
 | [main/app/settings/](main/app/settings/README.md) | 参数定义、RAM 缓存、CRC、轮换保存与旧版导入 |
 | [main/app/display/](main/app/display/) | 官方 esp_lvgl_port 初始化和显示配置 |
 | [main/app/boot_screen/](main/app/boot_screen/) | 狗图、逐行启动状态和出厂 MAC；完成后交给原 UI |
@@ -172,7 +172,7 @@ PCB、PIN.h 和文档中的 29 个 GPIO 对应一致；分区表已通过 ESP-ID
 
 2026-10-07 历史实现：闪光输出使用 GPIO38 和官方 RMT，默认高电平 20 ms、低电平恢复 1 ms，提供单次触发、1–30 ms 指定脉宽及忙状态接口。初始化只保持低电平，不自动触发；快门联动尚未接入。按用户要求停止后续测试和语法检查，移除本轮新增闪光测试文件。实机波形及外部闪光灯兼容性未验证。
 
-2026-10-15：闪光改为 GPIO42 下降沿 ISR 直接拉高 GPIO38，GPTimer 报警 ISR 结束脉冲，不经过任务通知或 RMT。默认目标 20 ms、恢复期至少 1 ms；支持任务和 ISR 调用。当前不做额外触点消抖或回充判定；关中断和 Flash cache 暂停仍可能延迟响应。详见[闪光说明](main/drivers/flash_trigger/README.md)。本轮用户确认编译通过；未运行测试，未上板验证。
+2026-10-15：闪光改为 GPIO42 下降沿 ISR 直接拉高 GPIO38，GPTimer 报警 ISR 结束脉冲，不经过任务通知或 RMT。默认目标 20 ms、恢复期至少 1 ms；支持任务和 ISR 调用。后续加入快门触发后 1 s 抑制，未做回充判定；关中断和 Flash cache 暂停仍可能延迟响应。详见[闪光说明](main/drivers/flash_trigger/README.md)。历史版本用户确认编译通过；本次改动未测试或上板验证。
 
 ## Flash 分区
 

@@ -99,25 +99,27 @@ void FocusMotor_HomeStep(uint32_t now_ms, uint8_t touched, FocusMotor_HomeComman
             FocusEncoder_GetSnapshot(&encoder);
             s_status.error_counts = encoder.position;
             ++s_status.attempts;
-            /* 不使用 abs(int32_t)，避免 INT32_MIN 取绝对值溢出。
-             * 首次触底只建候选零位，后续每次比较后仍重新置零。 */
+            /* 首次触底只建候选零位；校验成功后才设置触底位置偏移。 */
             const int32_t tolerance = (int32_t)FOCUS_MOTOR_HOME_TOLERANCE_COUNTS;
             uint8_t matched = (s_status.attempts > 1U) &&
                 (encoder.position > -tolerance) && (encoder.position < tolerance);
-            FocusEncoder_Zero();
             if (matched != 0U) {
+                FocusEncoder_SetPosition(FOCUS_MOTOR_HOME_CONTACT_POSITION);
                 s_status.zero_valid = 1U;
                 s_status.work_state = FOCUS_MOTOR_WORK_NORMAL;
-            } else if (s_status.attempts >= FOCUS_MOTOR_HOME_MAX_ATTEMPTS) {
-                FocusMotor_HomeFail();
             } else {
-                /* 本轮已制动；下一次 Step 才开始反向输出并建立计时基准。 */
-                s_phase = HOME_BACKOFF_PENDING;
+                FocusEncoder_Zero();
+                if (s_status.attempts >= FOCUS_MOTOR_HOME_MAX_ATTEMPTS) {
+                    FocusMotor_HomeFail();
+                } else {
+                    /* 本轮已制动；下一次 Step 才开始反向输出并建立计时基准。 */
+                    s_phase = HOME_BACKOFF_PENDING;
+                }
             }
             return;
         }
         command->mode = FOCUS_MOTOR_MODE_GLIDE;
-        command->output.duty_permille = FOCUS_MOTOR_GLIDE_DUTY_PERMILLE;
+        command->output.duty_permille = FOCUS_MOTOR_HOME_GLIDE_DUTY_PERMILLE;
         return;
     case HOME_BACKOFF_PENDING:
         s_backoff_start_ms = now_ms;
@@ -127,7 +129,7 @@ void FocusMotor_HomeStep(uint32_t now_ms, uint8_t touched, FocusMotor_HomeComman
         if ((uint32_t)(now_ms - s_backoff_start_ms) >= FOCUS_MOTOR_HOME_BACKOFF_MS) {
             s_phase = HOME_GLIDE;
             command->mode = FOCUS_MOTOR_MODE_GLIDE;
-            command->output.duty_permille = FOCUS_MOTOR_GLIDE_DUTY_PERMILLE;
+            command->output.duty_permille = FOCUS_MOTOR_HOME_GLIDE_DUTY_PERMILLE;
             return;
         }
         break;

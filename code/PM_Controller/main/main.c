@@ -164,8 +164,31 @@ void app_main(void)
     ESP_LOGI(TAG, "app_main initialization complete");
 
     TickType_t last_log_tick = xTaskGetTickCount();
+    uint64_t pending_shutters = 0;
+    bool shutter_save_pending = false;
+    esp_err_t shutter_error = ESP_OK;
     while (1) {
         vTaskDelayUntil(&last_log_tick, pdMS_TO_TICKS(1000));
+        const uint64_t edges = shutter_take_count();
+        pending_shutters = UINT64_MAX - pending_shutters < edges
+                           ? UINT64_MAX : pending_shutters + edges;
+        esp_err_t count_result = ESP_OK;
+        if (pending_shutters) {
+            count_result = settings_increment(SETTINGS_SHUTTER_COUNT, pending_shutters);
+            if (count_result == ESP_OK) {
+                pending_shutters = 0;
+                shutter_save_pending = true;
+            }
+        }
+        if (count_result == ESP_OK && shutter_save_pending) {
+            count_result = settings_commit_shutter();
+            if (count_result == ESP_OK) shutter_save_pending = false;
+        }
+        if (count_result != shutter_error) {
+            if (count_result == ESP_OK) ESP_LOGI(TAG, "Shutter count save recovered");
+            else ESP_LOGW(TAG, "Shutter count update/save failed: %s", esp_err_to_name(count_result));
+            shutter_error = count_result;
+        }
         log_distance();
         log_power();
     }
