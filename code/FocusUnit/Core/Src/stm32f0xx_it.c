@@ -156,7 +156,7 @@ void SysTick_Handler(void)
 void DMA1_Channel2_3_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Channel2_3_IRQn 0 */
-  /* USART1 TX/RX 共用 DMA 中断入口；当前没有启动收发传输。 */
+  /* USART1 TX/RX 共用 DMA 中断入口；当前控制协议使用串口中断。 */
 
   /* USER CODE END DMA1_Channel2_3_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_usart1_tx);

@@ -51,6 +51,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/FocusUnit/Motor/focus_motor_home.c
     Core/Src/FocusUnit/Motor/test.c
     Core/Src/FocusUnit/Scheduler/focus_scheduler.c
+    Core/Src/FocusUnit/Uart/focus_uart.c
 )
 
 # Debug 强制 -Os，避免生成工具链默认 -O0 造成 16 KB Flash 超限；保留 -g3。

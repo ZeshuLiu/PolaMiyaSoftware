@@ -1,9 +1,18 @@
 #include "FocusUnit/Motor/focus_motor.h"
 #include "FocusUnit/Motor/focus_motor_home.h"
 #include "FocusUnit/Motor/test.h"
+#include "FocusUnit/Encoder/focus_encoder.h"
+#include "FocusUnit/Adc/focus_adc.h"
 
 #define MOTOR_PERIOD_COUNTS 2400U
 #define MOTOR_PERMILLE 1000U
+#define MOTOR_BOOT_HOME_DELAY_MS 700U
+
+typedef enum {
+    BOOT_WAIT = 0,
+    BOOT_HOME,
+    BOOT_DONE
+} MotorBootPhase;
 
 FocusMotor_Config FocusMotor_ConfigData = { MOTOR_PERMILLE, FOCUS_MOTOR_DIR_A };
 volatile FocusMotor_Snapshot FocusMotor_State;
@@ -17,6 +26,16 @@ static uint8_t s_boot_checked;
 static uint8_t s_seek_zero;
 static uint8_t s_glide_active;
 static uint8_t s_glide_completed;
+static int32_t s_target_raw;
+static FocusMotor_MoveState s_move_state;
+static uint8_t s_move_active;
+static uint8_t s_move_settling;
+static uint32_t s_move_settle_start_ms;
+static uint32_t s_move_drive_start_ms;
+static uint32_t s_move_adc_sequence;
+static uint8_t s_move_adc_seen;
+static uint8_t s_move_stall_frames;
+static MotorBootPhase s_boot_phase;
 
 /* 成对写入比较预装载，在同一次 PWM 更新事件生效。 */
 static void set_ccr(uint32_t a, uint32_t b)
@@ -67,7 +86,16 @@ static void publish_snapshot(uint16_t duty)
     FocusMotor_State.zero_valid = home->zero_valid;
     FocusMotor_State.home_attempts = home->attempts;
     FocusMotor_State.home_error_counts = home->error_counts;
+    FocusMotor_State.target_raw = s_target_raw;
+    FocusMotor_State.move_state = s_move_state;
     __set_PRIMASK(primask);
+}
+
+static void cancel_move(void)
+{
+    if (s_mode == FOCUS_MOTOR_MODE_MOVE_RAW) s_move_state = FOCUS_MOTOR_MOVE_CANCELED;
+    s_move_active = 0U;
+    s_move_settling = 0U;
 }
 
 /* 内部制动不修改工作状态或寻零基准，不能把初始化误发布为正常。 */
@@ -153,10 +181,8 @@ HAL_StatusTypeDef FocusMotor_Init(TIM_HandleTypeDef *htim)
         enter_error();
         return HAL_OK;
     }
-    FocusMotor_HomeStart(FOCUS_MOTOR_HOME_DIRECTION);
-    s_seek_zero = 1U;
-    select_glide(FOCUS_MOTOR_HOME_DIRECTION);
-    FocusMotor_TestInit();
+    write_brake();
+    s_boot_phase = BOOT_WAIT;
     publish_snapshot(0U);
     return HAL_OK;
 }
@@ -182,6 +208,72 @@ static void step_open_loop(void)
 {
     write_drive(s_direction, s_open_loop_duty);
     publish_snapshot(s_open_loop_duty);
+}
+
+/* 每个 ADC 完整帧只计一次；丢帧或低于阈值时重新累计。 */
+static uint8_t move_stalled(void)
+{
+    FocusAdcMeasurement adc;
+    if (FocusAdc_GetSnapshot(&adc) == 0U) return 0U;
+    uint32_t age = adc.timestamp_ms - s_move_drive_start_ms;
+    if ((age == 0U) || (age >= 0x80000000U)) return 0U;
+    if ((s_move_adc_seen != 0U) && (adc.sequence == s_move_adc_sequence)) return 0U;
+    if ((s_move_adc_seen != 0U) && (adc.sequence != s_move_adc_sequence + 1U)) {
+        s_move_stall_frames = 0U;
+    }
+    s_move_adc_seen = 1U;
+    s_move_adc_sequence = adc.sequence;
+    if (adc.raw_motor > FOCUS_MOTOR_STALL_RAW_THRESHOLD) {
+        if (s_move_stall_frames < FOCUS_MOTOR_MOVE_STALL_FRAMES) ++s_move_stall_frames;
+    } else {
+        s_move_stall_frames = 0U;
+    }
+    return s_move_stall_frames >= FOCUS_MOTOR_MOVE_STALL_FRAMES;
+}
+
+/* 使用 64 位误差避免 int32 两端相减或取绝对值溢出。 */
+static void step_move_raw(uint32_t now_ms)
+{
+    FocusEncoderMeasurement encoder;
+    int64_t error;
+    FocusMotor_Direction direction;
+    FocusEncoder_GetSnapshot(&encoder);
+    error = (int64_t)s_target_raw - (int64_t)encoder.position;
+    if ((error >= -FOCUS_MOTOR_MOVE_TOLERANCE_COUNTS) &&
+        (error <= FOCUS_MOTOR_MOVE_TOLERANCE_COUNTS)) {
+        s_move_active = 0U;
+        if (s_move_settling == 0U) {
+            s_move_settling = 1U;
+            s_move_settle_start_ms = now_ms;
+            write_brake();
+            publish_snapshot(0U);
+        } else if ((s_move_state != FOCUS_MOTOR_MOVE_REACHED) &&
+                   ((uint32_t)(now_ms - s_move_settle_start_ms) >= FOCUS_MOTOR_MOVE_SETTLE_MS)) {
+            s_move_state = FOCUS_MOTOR_MOVE_REACHED;
+            publish_snapshot(0U);
+        }
+        return;
+    }
+    s_move_settling = 0U;
+    s_move_state = FOCUS_MOTOR_MOVE_MOVING;
+    if ((s_move_active != 0U) && (move_stalled() != 0U)) {
+        s_move_state = FOCUS_MOTOR_MOVE_STALLED;
+        s_move_active = 0U;
+        stop_output();
+        return;
+    }
+    direction = (error > 0) ? FocusMotor_ConfigData.positive_direction :
+        ((FocusMotor_ConfigData.positive_direction == FOCUS_MOTOR_DIR_A) ?
+         FOCUS_MOTOR_DIR_B : FOCUS_MOTOR_DIR_A);
+    if (s_move_active == 0U) {
+        s_move_drive_start_ms = now_ms;
+        s_move_adc_seen = 0U;
+        s_move_stall_frames = 0U;
+        s_move_active = 1U;
+    }
+    s_direction = direction;
+    write_drive(direction, FOCUS_MOTOR_MOVE_DUTY_PERMILLE);
+    publish_snapshot(FOCUS_MOTOR_MOVE_DUTY_PERMILLE);
 }
 
 /* 初始化分支：触底制动、推进寻零流程，并应用本轮输出命令。 */
@@ -220,20 +312,30 @@ static void step_home(uint32_t now_ms)
     }
 }
 
-/* 初始化优先推进寻零；只有零位有效后，test.c 才能生成开环测试命令。 */
+/* 上电延时后寻零，完成后制动；后续按命令推进运动。 */
 void FocusMotor_Step(uint32_t now_ms)
 {
-    FocusMotor_OutputCommand command;
     const FocusMotor_HomeStatus *home = FocusMotor_HomeGetStatus();
     if ((s_initialized == 0U) || (home->work_state == FOCUS_MOTOR_WORK_ERROR)) return;
+    if (s_boot_phase == BOOT_WAIT) {
+        if (now_ms < MOTOR_BOOT_HOME_DELAY_MS) return;
+        s_boot_phase = BOOT_HOME;
+        FocusMotor_HomeStart(FOCUS_MOTOR_HOME_DIRECTION);
+        s_seek_zero = 1U;
+        select_glide(FOCUS_MOTOR_HOME_DIRECTION);
+    }
     if (home->work_state == FOCUS_MOTOR_WORK_INITIALIZING) {
         step_home(now_ms);
+        if ((s_boot_phase == BOOT_HOME) &&
+            (home->work_state == FOCUS_MOTOR_WORK_NORMAL) && (home->zero_valid != 0U)) {
+            s_boot_phase = BOOT_DONE;
+        }
         return;
     }
-    if (FocusMotor_TestStep(now_ms, home->zero_valid, &command) != 0U) {
-        select_open_loop(command.direction, command.duty_permille);
-    }
     switch (s_mode) {
+    case FOCUS_MOTOR_MODE_MOVE_RAW:
+        step_move_raw(now_ms);
+        break;
     case FOCUS_MOTOR_MODE_GLIDE:
         step_glide(now_ms);
         break;
@@ -250,7 +352,9 @@ void FocusMotor_Step(uint32_t now_ms)
 void FocusMotor_Glide(FocusMotor_Direction direction, uint8_t seek_zero)
 {
     if (can_control() == 0U) return;
+    s_boot_phase = BOOT_DONE;
     FocusMotor_TestStop();
+    cancel_move();
     stop_output();
     s_seek_zero = (seek_zero != 0U);
     if (s_seek_zero != 0U) FocusMotor_HomeStart(direction);
@@ -261,15 +365,39 @@ void FocusMotor_Glide(FocusMotor_Direction direction, uint8_t seek_zero)
 void FocusMotor_OpenLoop(FocusMotor_Direction direction, uint16_t duty_permille)
 {
     if (can_control() == 0U) return;
+    s_boot_phase = BOOT_DONE;
+    uint8_t was_move = (s_mode == FOCUS_MOTOR_MODE_MOVE_RAW);
     FocusMotor_TestStop();
+    cancel_move();
+    if (was_move != 0U) stop_output();
     select_open_loop(direction, duty_permille);
+    if (was_move != 0U) publish_snapshot(0U);
 }
 
 void FocusMotor_Stop(void)
 {
     if (can_control() == 0U) return;
+    s_boot_phase = BOOT_DONE;
+    FocusMotor_TestStop();
+    cancel_move();
+    stop_output();
+}
+
+HAL_StatusTypeDef FocusMotor_MoveRaw(int32_t target_raw)
+{
+    if (FocusMotor_HomeGetStatus()->work_state == FOCUS_MOTOR_WORK_ERROR) return HAL_ERROR;
+    if ((can_control() == 0U) || (FocusMotor_HomeGetStatus()->zero_valid == 0U)) return HAL_BUSY;
+    s_boot_phase = BOOT_DONE;
     FocusMotor_TestStop();
     stop_output();
+    s_target_raw = target_raw;
+    s_move_state = FOCUS_MOTOR_MOVE_MOVING;
+    s_move_active = 0U;
+    s_move_settling = 0U;
+    s_mode = FOCUS_MOTOR_MODE_MOVE_RAW;
+    /* 下一次电机任务检查位置、制动稳定或开始驱动。 */
+    publish_snapshot(0U);
+    return HAL_OK;
 }
 
 void FocusMotor_GetSnapshot(FocusMotor_Snapshot *snapshot)
@@ -285,7 +413,9 @@ HAL_StatusTypeDef FocusMotor_SetPositiveDirection(FocusMotor_Direction direction
 {
     if (FocusMotor_HomeGetStatus()->work_state == FOCUS_MOTOR_WORK_ERROR) return HAL_ERROR;
     if (can_control() == 0U) return HAL_BUSY;
+    if (s_mode != FOCUS_MOTOR_MODE_STOP) return HAL_BUSY;
     if ((direction != FOCUS_MOTOR_DIR_A) && (direction != FOCUS_MOTOR_DIR_B)) return HAL_ERROR;
     FocusMotor_ConfigData.positive_direction = direction;
+    publish_snapshot(0U);
     return HAL_OK;
 }

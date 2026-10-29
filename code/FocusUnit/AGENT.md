@@ -1,19 +1,31 @@
 # Focus Unit 软件工程记录
 
-## 当前实现概览（2026-10-11，代码核对）
+## 当前实现概览（2026-10-29，代码核对）
 
-当前是已集成的基础采集与电机开环控制固件，目标为 STM32F030F4Px，48 MHz、16 KB Flash、4 KB RAM。
+当前是已集成的基础采集、电机开环控制与 RAW 定位固件，目标为 STM32F030F4Px，48 MHz、16 KB Flash、4 KB RAM。
 
 | 功能 | 当前实现 | 尚未实现或待确认 |
 | --- | --- | --- |
 | 调度 | TIM14 1 ms 中断；编码器 1 ms、电机 Step 10 ms、ADC 100 ms，由调度器统一触发；记录积压与延迟，空闲 WFI | 时基精度与实机最长任务延迟待测 |
 | ADC | 七通道中断扫描、自校准、VDDA 补偿、引脚 mV、MCU 温度估算；完成帧交接与 HAL 错误终止，不屏蔽全局中断；采集正常（用户确认） | NTC 实际温度、分压前轨电压、电机实际电流换算未实现，参数待核实；尚未使用 ADC DMA |
-| 电机 | Stop/Glide/OpenLoop/Error；20 kHz PWM；上电沿宏定义方向寻零，相邻触底位置差严格小于 50 计数才进入原 A/B 测试；最多触底 5 次，失败锁存；用户确认测试没有问题 | 各故障边界的定量结果未记录；速度/位置闭环、行程管理、过温保护及单次 Glide 超时未实现 |
+| 电机 | Stop/Glide/OpenLoop/Error/MoveRaw；20 kHz PWM；调度器启动 700 ms 后自动寻零，成功后制动等待指令；最多触底 5 次，失败锁存 | 新启动流程和串口控制未实测；速度闭环、行程管理、过温保护及单次 Glide 超时未实现 |
 | 编码器 | TIM3 16 位硬件四倍频；软件 int32_t 位置累计、双向回绕、置零、符号映射，不屏蔽全局中断 | 计数到实际位移/速度的换算未实现；线序和滤波适配待实机确认 |
-| 串口 | USART1 460800 8N1 与 TX/RX DMA、IRQ 已预配置 | 未启动收发，无控制协议、状态上报或串口升级实现 |
+| 串口 | USART1 460800 8N1，中断收发；[UART 协议](docs/UART_PROTOCOL.md)支持状态、ADC 与电机指令 | 未编译或实机验证；无串口升级实现 |
 | 调试与故障 | SWD、模块快照和软件置零请求；初始化错误/HardFault 直接令桥输入双低 | NMI 当前只停留，没有调用桥停机；硬件异常与调试恢复覆盖尚未完成定量验收 |
 
 2026-10-11：用户已确认此前 ADC/编码器精简及单次 Glide 运行正常，并在零位校验、重试及 `step_home()` 提取完成后反馈“测试没有问题”。智能体仅执行静态核对，未编译或烧写；未收到测试版本、时长及各故障边界的定量记录。
+
+### 2026-10-29：RAW 定位与 UART 草案
+
+- 调度器启动 700 ms 后自动沿 B 方向寻零，成功后制动等待指令；零位尚未确认时所有串口请求均返回 BUSY，包含状态及 ADC 查询。USART 指令支持状态、ADC、Stop、Glide、OpenLoop、MoveRaw，主循环处理，重复请求复用缓存响应。
+- 用户反馈占空比低于 70% 时电机基本不动，80%～100% 较好；定位改为固定 80% 的双方向开关控制，到位精度及惯性过冲需要实机确认。
+- 按用户要求，共用的电机堵转 ADC 原始值阈值从 1200 调整为 1700，影响找零、普通 Glide 和定位；实机效果待确认。
+- RAW 定位连续 3 个不同 ADC 完整帧超过阈值才判堵转；低于或等于阈值、丢帧及重新驱动时清除累计。ADC 周期 100 ms，堵转制动会延迟；找零和普通 Glide 保留单帧判定。
+
+- 新增 `FocusMotor_MoveRaw(int32_t)` 和定位状态：相对当前零点的软件累计四倍频位置；仅正常且零位有效时受理。误差使用 int64 防止相减溢出，目标替换先制动；到位后持续监测，超出允差重新修正。
+- 定位按误差正负以 800‰ 驱动对应方向，进入 ±50 计数制动并确认 1 s；稳定后标记 REACHED，超出允差则转回 MOVING 并修正，直到其他命令取消。定位连续 3 个 ADC 帧超阈值时制动并标记 STALLED，不置零。电机正方向必须对应编码器位置增加，参数及实机稳定性尚待确认；没有行程限制或定位超时，编码器位置回绕时不按最短路径处理。
+- 定位被 Stop、Glide、OpenLoop 取消；从定位切换 OpenLoop 时先制动，普通开环更新保留原输出直到下一 Step。正方向更改及 SWD 置零只允许停止模式。调用者不得运行中直接修改配置、编码器符号或低层置零。
+- [UART 协议](docs/UART_PROTOCOL.md)已实现六条查询和控制指令、CRC 与最近请求去重。本轮不编译、不烧写、不测试；容量、串口吞吐和实机效果均未验证，历史构建数据不代表本次固件。
 
 ### 前一轮更改记录（2026-10-11，单次 Glide）
 
@@ -30,15 +42,15 @@
 
 - main 每 10 ms 调用 `FocusMotor_Step(now_ms)`，Step 分发初始化与正常工作，初始化分支提取为内部 `step_home()`，行为不变。PWM 输出层管理 Stop/Glide/OpenLoop/Error；`focus_motor_home.c/.h` 管理触底校验、重试、退回计时及 ADC 帧时间判定；`test.c/.h` 只生成原 A/B 开环波形。各模块共用调度器，不增加调度周期或阻塞延时。
 - `FocusMotor_Glide(direction, seek_zero)` 固定使用 700 千分比（70%）。`seek_zero=0` 为普通 Glide，电流达到停止条件后只制动，不置零、不修改零位有效标志或触底次数；`seek_zero=1` 启动完整寻零流程，清除旧的零位确认并重新计次。正常状态下的显式命令会取消自动测试，手动寻零成功后保持 Stop，等待下一条指令。
-- 上电使用 `FOCUS_MOTOR_HOME_DIRECTION`，默认 A，与逻辑正方向映射独立。停止条件沿用 `raw_motor > FOCUS_MOTOR_STALL_RAW_THRESHOLD`，默认 1200。只接受请求时间严格晚于本次驱动开始的 ADC 帧，排除启动前或上一次堵转的旧高值。
+- 当时上电使用 `FOCUS_MOTOR_HOME_DIRECTION`，默认 B；当前改为指令指定寻零方向。停止条件为 `raw_motor > FOCUS_MOTOR_STALL_RAW_THRESHOLD`，当前阈值为 1700。只接受请求时间严格晚于本次驱动开始的 ADC 帧，排除启动前或上一次堵转的旧高值。
 - 第一次触底：制动、记录清零前位置并置零，仅建立候选零位，`zero_valid` 保持 0。下一次电机任务开始反向开环退回，以 `FOCUS_MOTOR_HOME_BACKOFF_DUTY_PERMILLE=700` 驱动 `FOCUS_MOTOR_HOME_BACKOFF_MS=1000` ms，再沿原寻零方向 Glide。
 - 后续每次触底先记录清零前位置 `p`，以 `-50 < p < 50` 判断通过，再执行编码器置零；等于正负 50 均失败。允差由用户指定为 `FOCUS_MOTOR_HOME_TOLERANCE_COUNTS=50` 个四倍频计数。通过后 `zero_valid=1`、工作状态为正常；不通过则本次触底建立新的候选零位，继续退回和校验。此判定确认回零重复性，不是绝对位置传感器测量。
 - `FOCUS_MOTOR_HOME_MAX_ATTEMPTS=5` 包含首次触底，最早第二次、最晚第五次触底确认；第五次通过仍成功，失败则立即制动、取消测试并进入 Error，不再退回或执行第六次。次数只在触底时增加，未增加单次 Glide 超时；若始终没有停止条件，仍停留在初始化 Glide。
 - 工作状态 `work_state` 固定为初始化 0、正常 1、错误 2，供后续 UART 上报；寻零 Glide、触底制动和反向退回都属于初始化。快照增加 `seek_zero`、`zero_valid`、`home_attempts`、`home_error_counts`。`initialized` 仍只表示 PWM 初始化成功；`glide_completed` 表示普通 Glide 停止或完整寻零成功，自动测试只以 `zero_valid` 放行。
-- 初始化期间 Glide/OpenLoop/Stop/方向修改指令不能覆盖寻零；错误状态下均忽略或返回 HAL_ERROR。重复 Init 在运行中返回 HAL_BUSY，在错误状态返回 HAL_ERROR。SWD 的 `g_focus_encoder_zero_request` 只在正常状态消费为置零操作，初始化/错误时丢弃，防止篡改候选零位。
+- 初始化期间 Glide/OpenLoop/Stop/方向修改指令不能覆盖寻零；错误状态下均忽略或返回 HAL_ERROR。重复 Init 在运行中返回 HAL_BUSY，在错误状态返回 HAL_ERROR。SWD 的 `g_focus_encoder_zero_request` 只在正常 STOP 模式消费为置零操作，其他状态丢弃，防止篡改候选零位。
 - 故障与最后触底诊断记录存入 16 B 的 `.noinit`，两个链接脚本均将该段放在启动清零范围 `_sbss.._ebss` 之外、堆栈预留之前。NRST、软件和看门狗复位保留故障，RCC POR/PDR 上电复位清除；不写 Flash。保留故障的启动仍初始化 PWM 为制动并运行采集/调度，允许未来 UART 读取错误状态；重烧固件或调试器主动清 RAM 不属于该保留保证。
-- 原测试仍为 A/B 各加速、保持、减速、制动各 3 s，整圈 24 s；上电只有零位有效后才建立测试时间起点。新寻零源文件已加入 CMake；独立构建脚本递归取 Core/Src，无需修改。
-- 本轮只做接口、状态转移、计数和允差边界、调用入口、启动清零范围及文件差异的静态核对；未调用编译器、构建、烧写或进行电机实机验证。反向 1 s 使用调度器时间，实际持续时间会受 10 ms 调度粒度及任务延迟影响。UART 尚未启动收发。
+- 当时原测试为 A/B 各加速、保持、减速、制动各 3 s，整圈 24 s；现已不在上电后自动运行。新寻零源文件已加入 CMake；独立构建脚本递归取 Core/Src，无需修改。
+- 当时只做接口、状态转移、计数和允差边界、调用入口、启动清零范围及文件差异的静态核对；未调用编译器、构建、烧写或进行电机实机验证。反向 1 s 使用调度器时间，实际持续时间会受 10 ms 调度粒度及任务延迟影响。当时 UART 尚未启动收发。
 - 用户随后确认“测试没有问题”，并授权将软件仓库全部现有改动提交本地 Git。该反馈记录为当前版本的用户测试结果，不扩展为正负 50 计数、第五次失败、各类复位和故障指令拦截均已逐项验证。
 
 ### ADC 与编码器精简（2026-10-11）
@@ -112,7 +124,7 @@
 
 - TIM14：1 ms 更新中断（PSC=47、ARR=999），ISR 只计时并设置任务标志。main 原子取出标志后执行；编码器 1 ms、电机 Step 10 ms、ADC 100 ms，均由调度器触发。绝对时间驱动状态机，记录延迟/合并任务。
 - ADC：上电硬件自校准；采用 PCLK/4 = 12 MHz（`ADC_CLOCK_SYNC_PCLK_DIV4`）、239.5 周期采样，七通道每 100 ms 一组，各通道 10 Hz。单通道采样约 19.96 us、完整转换约 21 us，七通道硬件转换合计约 147 us（均为标称时钟下的计算值，未测实机中断延迟）。ISR 收集原始值，main 换算并发布测量结构体，用工厂 VREFINT_CAL 补偿 VDDA；保留有效性、序号和时间戳。
-- 电机：TIM1 20 kHz（PSC=0、ARR=2399），手册推荐的驱动/制动 PWM，停止用 IN1=IN2=1 制动，正确处理上电唤醒和 0/100% 占空比。A 3s 加速/3s 运行/3s 减速/3s 停止，随后 B 同样四阶段，24s 循环。最大占空比默认 100%，正方向映射可配置。加减速是开环占空比变化，不声称实际转速闭环控制。
+- 电机：TIM1 20 kHz（PSC=0、ARR=2399），手册推荐的驱动/制动 PWM，停止用 IN1=IN2=1 制动。原 A/B 开环测试代码保留，但上电不再自动运行。最大占空比默认 100%，正方向映射可配置；开环占空比变化不代表转速闭环控制。
 - 编码器：TIM3 ARR=65535，硬件四倍频，1ms 任务采样 CNT 并以有符号模差累计 int32_t 位置，支持负数和回绕；提供独立测量结构体、一致性读取、外部置零及符号映射接口。相邻采样实际位移必须小于 32768 计数；记录延迟，避免每个边沿 IRQ。
 - PWM/编码器边沿由硬件处理；ADC 使用中断，TIM14 驱动任务，运行阶段不采用阻塞延时。USART1 不启动业务。SWD 保留；调试暂停时冻结 TIM14/TIM3，不冻结 TIM1，避免把桥输入冻结在持续驱动电平。断点不是电机停止命令；正常状态下可在主循环调用 `FocusMotor_Stop()`，初始化期间 Stop 不会取消寻零。暂停 TIM14 会暂停退回计时而 PWM 继续运行，不能用寻零中的断点验证 1 s 时长；调试暂停时的编码器数据不用于实际位移验收。
 
@@ -133,7 +145,7 @@
 | --- | --- | --- |
 | 调度 | `FocusUnit/Scheduler/focus_scheduler.h/.c` | Init、OnTick、Take、Now、GetSnapshot、Idle |
 | ADC | `FocusUnit/Adc/focus_adc.h/.c` | Init、Request、Process、OnConversionComplete、OnError、GetSnapshot |
-| 电机 | `FocusUnit/Motor/focus_motor.h/.c` | Init、Step、Glide、OpenLoop、Stop、SetPositiveDirection、GetSnapshot |
+| 电机 | `FocusUnit/Motor/focus_motor.h/.c` | Init、Step、Glide、OpenLoop、MoveRaw、Stop、SetPositiveDirection、GetSnapshot |
 | 电机寻零 | `FocusUnit/Motor/focus_motor_home.h/.c` | Motor 内部触底比较、置零、重试、退回计时、ADC 帧判定和跨复位故障锁存 |
 | 电机开环测试 | `FocusUnit/Motor/test.h/.c` | TestStep、TestOpenLoop：按调度器时间生成原 A/B 开环占空比 |
 | 编码器 | `FocusUnit/Encoder/focus_encoder.h/.c` | Init、Update、Zero、SetSign、GetSnapshot |
@@ -142,11 +154,11 @@
 - ADC 对外结构体为 `FocusAdcMeasurement`。工厂参考计算为 `VDDA_mV = 3300 * VREFINT_CAL / ADC_VREFINT`，引脚电压为 `raw * VDDA / 4095`，采用整数及舍入。外部 NTC、电源轨、电机 IPROPI 当前只发布校准后的引脚 mV，不提供未经核实的 NTC 温度、轨电压或电机电流单位换算。
 - MCU 温度使用本型号的 TS_CAL1（30 C）和典型斜率 4.3 mV/C，属于估算，不使用该型号未声明的 TS_CAL2；不再检查温度校准字或限幅。`valid` 仅表示 VREFINT 非零，可进行换算，不代表温度精度。
 - ADC 完整结构体的发布与 GetSnapshot 均由主循环执行，直接复制，不屏蔽中断。原始缓冲区和事件标记使用 volatile，完成标志前后使用内存屏障；ISR 收满后停止写缓冲区，主循环处理后才允许下一帧启动。
-- 电机 `FocusMotor_ConfigData.max_duty_permille` 默认 1000，控制原 A/B Demo 的最大占空比；Glide 独立使用固定 700。`positive_direction` 默认 A，只定义逻辑正向，上电寻零方向独立由 `FOCUS_MOTOR_HOME_DIRECTION` 指定，原 Demo 物理顺序仍为 A 后 B。`FocusMotor_SetPositiveDirection()` 只允许正常状态修改；非法方向或故障返回 HAL_ERROR，初始化返回 HAL_BUSY，快照符号在下一次发布时更新。
+- 电机 `FocusMotor_ConfigData.max_duty_permille` 默认 1000，控制原 A/B Demo 的最大占空比；Glide 独立使用固定 700。`positive_direction` 默认 A，只定义逻辑正向，寻零方向由 Glide 命令指定。`FocusMotor_SetPositiveDirection()` 只允许正常 STOP 状态修改；非法方向或故障返回 HAL_ERROR，未就绪或运动中返回 HAL_BUSY。
 - 电机两个 CCR 开启预装载，成对更新期间用 CR1.UDIS 抑制更新事件，恢复后于同一次 PWM 更新事件生效。0% 为双高制动，100% 使用 ARR+1=2400；驱动内无软件唤醒、换向等待或周期计时。
-- 只有 test.c 根据调度器时基计算开环测试波形，并每圈重建测试基准。电机 Init/Step/Glide/OpenLoop/Stop/SetPositiveDirection 在主循环上下文调用，GetSnapshot 保留 ISR 一致读取接口。
+- 只有 test.c 根据调度器时基计算开环测试波形，并每圈重建测试基准。电机 Init/Step/Glide/OpenLoop/MoveRaw/Stop/SetPositiveDirection 在主循环上下文调用，GetSnapshot 保留 ISR 一致读取接口。
 - 编码器 `FocusEncoderMeasurement.position` 为 int32_t。相邻计数器差值按 16 位模差解释，再累计到软件位置；32 位位置溢出后自然回绕，不饱和、不锁存。Update/Zero/SetSign/GetSnapshot 均仅由主循环调用，无临界区；相邻实际位移小于 32768 计数是模差算法的适用条件。`elapsed_ms` 与调度积压统计用于观察主循环延迟。
-- 编码器符号由 `FocusEncoder_SetSign(+1/-1)` 独立配置，不假设电机 A 的位移必然是编码器正向。低层 C 接口 `FocusEncoder_Zero()` 保留，调用者不能在寻零流程中自行改基准；SWD 可置 `g_focus_encoder_zero_request=1`，由下一次 encoder 任务消费，仅正常状态执行置零。Zero 重取硬件 CNT 为基准，不关闭硬件计数。
+- 编码器符号由 `FocusEncoder_SetSign(+1/-1)` 独立配置，不假设电机 A 的位移必然是编码器正向。低层 C 接口 `FocusEncoder_Zero()` 保留，调用者不能在寻零流程中自行改基准；SWD 可置 `g_focus_encoder_zero_request=1`，由下一次 encoder 任务消费，仅正常 STOP 模式执行置零。Zero 重取硬件 CNT 为基准，不关闭硬件计数。
 - SWD 观察变量：`g_focus_adc_measurement`、`g_focus_encoder_measurement`、`g_focus_motor_state`、`g_focus_scheduler_status`、`g_focus_fault`。模块测量与应用观察快照使用相同结构体类型；快照由 main 更新。
 - 调度状态记录三类任务标志合并次数及最长等待时间，HAL SysTick 保留。空闲采用屏蔽中断、检查标志、WFI、恢复 PRIMASK 的顺序，避免检查与休眠之间丢失调度唤醒。
 - 初始化错误与 HardFault 会通过 `FocusUnit_FaultStop()` 将 PA9/PA10 直接改为低电平 GPIO，桥进入滑行/睡眠；该错误停止路径不等待 PWM 更新或调度器。

@@ -51,6 +51,9 @@ void FocusMotor_HomeBoot(void)
         s_status.attempts = (uint8_t)s_retained_fault.attempts;
         s_status.error_counts = s_retained_fault.error_counts;
     }
+    if (s_status.work_state != FOCUS_MOTOR_WORK_ERROR) {
+        s_status.work_state = FOCUS_MOTOR_WORK_NORMAL;
+    }
     /* 避免旧 POR 标志使下一次软件/外部复位误判为重新上电。 */
     __HAL_RCC_CLEAR_RESET_FLAGS();
 }

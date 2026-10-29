@@ -31,6 +31,7 @@
 #include "FocusUnit/Adc/focus_adc.h"
 #include "FocusUnit/Motor/focus_motor.h"
 #include "FocusUnit/Encoder/focus_encoder.h"
+#include "FocusUnit/Uart/focus_uart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,13 +52,13 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-/* SWD 观察变量由主循环复制，当前没有串口业务。
+/* SWD 观察变量由主循环复制。
  * ADC 和编码器快照仅在主循环读取；这些副本用于调试观察。 */
 volatile FocusAdcMeasurement g_focus_adc_measurement;
 volatile FocusEncoderMeasurement g_focus_encoder_measurement;
 volatile FocusMotor_Snapshot g_focus_motor_state;
 volatile FocusSchedulerStatus g_focus_scheduler_status;
-volatile uint32_t g_focus_fault; /* 1=ADC，2=编码器，3=电机，4=调度，5=其他初始化错误 */
+volatile uint32_t g_focus_fault; /* 1=ADC，2=编码器，3=电机，4=调度，5=UART */
 /* SWD 置 1 后由下一次编码器任务消费并清零；C 接口也可调用 Zero。 */
 volatile uint8_t g_focus_encoder_zero_request;
 /* USER CODE END PV */
@@ -146,6 +147,11 @@ int main(void)
     g_focus_fault = 4U;
     Error_Handler();
   }
+  if (FocusUart_Init(&huart1) != HAL_OK)
+  {
+    g_focus_fault = 5U;
+    Error_Handler();
+  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -165,13 +171,15 @@ int main(void)
       const uint8_t zero_requested = g_focus_encoder_zero_request;
       g_focus_encoder_zero_request = 0U;
       if ((zero_requested != 0U) &&
-          (FocusMotor_State.work_state == FOCUS_MOTOR_WORK_NORMAL))
+          (FocusMotor_State.work_state == FOCUS_MOTOR_WORK_NORMAL) &&
+          (FocusMotor_State.mode == FOCUS_MOTOR_MODE_STOP))
       {
         FocusEncoder_Zero();
       }
     }
     /* 每轮处理 ADC 完整帧或 HAL 错误。 */
     FocusAdc_Process(dispatch.now_ms);
+    FocusUart_Process();
     if (FocusAdc_GetSnapshot(&adc_snapshot) != 0U)
     {
       g_focus_adc_measurement = adc_snapshot;

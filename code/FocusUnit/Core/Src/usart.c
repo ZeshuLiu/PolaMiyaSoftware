@@ -16,7 +16,7 @@
   *
   ******************************************************************************
   */
-/* USART1 仅完成硬件预配置，尚未启动控制协议、收发或串口升级业务。 */
+/* USART1 用于控制协议；收发使用中断，DMA 保留预配置。 */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
@@ -69,7 +69,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
   if(uartHandle->Instance==USART1)
   {
   /* USER CODE BEGIN USART1_MspInit 0 */
-  /* PA2=TX、PA3=RX；DMA1_CH3 接收、CH2 发送，Normal 模式，只预配置。 */
+  /* PA2=TX、PA3=RX；DMA1_CH3 接收、CH2 发送，Normal 模式，当前未使用。 */
 
   /* USER CODE END USART1_MspInit 0 */
     /* USART1 clock enable */
