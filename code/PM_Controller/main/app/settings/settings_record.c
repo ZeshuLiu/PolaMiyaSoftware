@@ -16,6 +16,7 @@ static const parameter_t parameters[] = {
     {SETTINGS_SHUTTER_COUNT, offsetof(settings_values_t, shutter_count), 0, UINT64_MAX, true},
     {SETTINGS_MOTOR_RUN_MS, offsetof(settings_values_t, motor_run_ms), 0, UINT64_MAX, true},
     {SETTINGS_BACKLIGHT_PERCENT, offsetof(settings_values_t, backlight_percent), 100, 100, false},
+    {SETTINGS_FILM_REMAINING, offsetof(settings_values_t, film_remaining), 6, 8, false},
 };
 #define PARAMETER_COUNT (sizeof(parameters) / sizeof(parameters[0]))
 #define ENTRY_BYTES 12U /* ID: u16, length: u16, value: u64; all little-endian. */

@@ -1,10 +1,18 @@
-# UI 设计资源
+# UI 设计
+
+2026-10-29：当前 HOME / INFO 沿用明亮配色；HOME 上 ACTUAL、下 FOCUS，两标题字体统一，侧栏仅图标，电池靠右，UPTIME 位于 INFO。设计源、预览和实现边界见 [竖屏 UI 说明](PortraitUI/README.md)，历史三版提案保留。独立 [EJECT 设计](PortraitUI/eject.svg) 使用窄侧栏，停止成功直接返回 HOME；电机斜坡及相纸结算见 [UI 模块](../code/PM_Controller/main/app/ui/README.md)。本轮未编译、测试或烧录，实屏待验证。
+
+2026-10-20 充电状态图标已接入：HOME / EJECT 共用充电动画、上移后的充满对勾、无电池斜杠和待确认问号。资源为 [battery-icons.svg](PortraitUI/battery-icons.svg)，CHG/STB 与 USB 状态判断见 [充电状态模块](../code/PM_Controller/main/app/charge_status/README.md)。新功能未编译、测试或上板验证。
+
+2026-10-25 吐片页取消渐变：启动成功直接进入完整亮度的绿色页面，停止成功直接返回 HOME；电机仍保留 1 s 启停斜坡，余量在最终停止斜坡目标结束后结算。静态预览不变。未编译、测试或上板验证。
+
+2026-10-20 新增独立 [EJECT 吐片页](PortraitUI/eject.svg) 和 [预览](PortraitUI/eject.png)：绿色主体、黑色顶栏、本次用时、电流圆环及放大的吐片动画；小于 1 A 显示 `.xxx`。无 EJECTING / PRESS TO STOP。运行时隐藏 HOME，上下键不操作，中键停止成功后直接返回；原电机斜坡逻辑保留。设计、生成资源和代码已接入，未编译、测试或烧录，实屏未验证。详见 [当前竖屏 UI](PortraitUI/README.md)。
 
 2026-10-19 新增 [开机画面](PortraitUI/boot.svg) 与 [预览](PortraitUI/boot.png)：白底黑狗圆角图、六行初始化日志，各行显示 `模块 .... [OK]` 或 `[FAIL]`，初始化中显示 `[...]`；底部为 `MAC : [出厂MAC]`。已接入主控启动；未编译、未上板验证。
 
 2026-10-19 当前字体：标题和大距离数字使用 Space Mono Bold，小字、单位及 INFO/SETUP 使用 Roboto Mono。当前方案、预览和导出入口见 [竖屏 UI 说明](PortraitUI/README.md)。临时方案、对比图和中间生成脚本已清理；原有已跟踪历史文件保留，不作为当前固件字体来源。两种官方字体、固定来源及 OFL 1.1 许可随软件工程保存。
 
-2026-10-18 图标与底纹更新：已按用户确认的 [v11 SVG](PortraitUI/key-icons-v11-proposal.svg) 修改正式 UI 源码，图标保持大小、主笔画加粗至 2 px，位置后续调整见文末 2026-10-19 记录；深色连续底纹宽 17 px，上下各留 20 px，保留上下渐变、直边及两条按键分隔线。本轮未编译、未烧录，实屏效果待确认。以下为历史实现与验证记录。
+历史记录，2026-10-18 图标与底纹更新：已按用户确认的 [v11 SVG](PortraitUI/key-icons-v11-proposal.svg) 修改正式 UI 源码，图标保持大小、主笔画加粗至 2 px，位置后续调整见文末 2026-10-19 记录；深色连续底纹宽 17 px，上下各留 20 px，保留上下渐变、直边及两条按键分隔线。本轮未编译、未烧录，实屏效果待确认。以下为历史实现与验证记录。
 
 2026-10-18 后续确认：用户反馈当前版本“测试 OK”，已记录到固件验证状态；下文未验证说明保留实现阶段边界，本轮提交未额外构建或测试。
 

@@ -181,29 +181,63 @@ static esp_err_t write_record(unsigned int index, const uint8_t *record)
                           record + SETTINGS_COMMIT_OFFSET, SETTINGS_COMMIT_BYTES);
 }
 
-esp_err_t settings_commit(void)
+/* Caller holds the parameter mutex. A selected-field save uses the last persisted
+ * values for every other field; never silently save an unconfirmed backlight edit. */
+static esp_err_t commit_values_locked(const settings_values_t *values)
 {
-    if (!store.mutex) {
-        return ESP_ERR_INVALID_STATE;
-    }
-    xSemaphoreTake(store.mutex, portMAX_DELAY);
     esp_err_t result = store.status.writable ? ESP_OK : store.status.storage_error;
-    if (result == ESP_OK && store.status.dirty) {
+    if (result == ESP_OK && (!store.status.loaded_from_eeprom ||
+                            memcmp(values, &store.persisted_values, sizeof(*values)) != 0)) {
         uint8_t record[SETTINGS_RECORD_BYTES];
         const unsigned int next = store.active_record < 0 ? 0
             : ((unsigned int)store.active_record + 1) % RECORD_COUNT;
         const uint32_t sequence = store.status.sequence + 1;
-        settings_record_encode(&store.values, sequence, record);
+        settings_record_encode(values, sequence, record);
         result = write_record(next, record);
         if (result == ESP_OK) {
             store.active_record = (int)next;
             store.status.sequence = sequence;
             store.status.loaded_from_eeprom = true;
-            store.status.dirty = false;
-            store.persisted_values = store.values;
+            store.persisted_values = *values;
         }
     }
+    store.status.dirty = !store.status.loaded_from_eeprom ||
+        memcmp(&store.values, &store.persisted_values, sizeof(store.values)) != 0;
     store.status.storage_error = result;
+    return result;
+}
+
+esp_err_t settings_commit(void)
+{
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    const esp_err_t result = commit_values_locked(&store.values);
+    xSemaphoreGive(store.mutex);
+    return result;
+}
+
+static esp_err_t commit_film_locked(void)
+{
+    settings_values_t values = store.persisted_values;
+    values.film_remaining = store.values.film_remaining;
+    return commit_values_locked(&values);
+}
+
+esp_err_t settings_commit_film(void)
+{
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    const esp_err_t result = commit_film_locked();
+    xSemaphoreGive(store.mutex);
+    return result;
+}
+
+esp_err_t settings_consume_film(void)
+{
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    if (store.values.film_remaining > 0) --store.values.film_remaining;
+    const esp_err_t result = commit_film_locked();
     xSemaphoreGive(store.mutex);
     return result;
 }

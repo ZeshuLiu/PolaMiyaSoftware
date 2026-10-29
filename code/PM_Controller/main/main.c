@@ -3,6 +3,8 @@
 #include "hc165.h"
 #include "flash_trigger.h"
 #include "film_motor.h"
+#include "film_reload.h"
+#include "usb_power.h"
 #include "ui.h"
 #include "lcd_st7789.h"
 #include "settings.h"
@@ -98,6 +100,10 @@ void app_main(void)
     boot_screen_complete(ESP_OK);
 
     boot_screen_begin(BOOT_STAGE_KEYS);
+    const esp_err_t usb_result = usb_power_init();
+    if (usb_result != ESP_OK) {
+        ESP_LOGW(TAG, "USB detection init failed: %s", esp_err_to_name(usb_result));
+    }
     ESP_LOGI(TAG, "hc165_init begin");
     hc165_init();
     ESP_LOGI(TAG, "hc165_init done");
@@ -120,10 +126,17 @@ void app_main(void)
 
     boot_screen_begin(BOOT_STAGE_STORAGE);
     ESP_LOGI(TAG, "settings_init begin");
-    const esp_err_t storage_result = settings_init();
+    esp_err_t storage_result = settings_init();
     ESP_LOGI(TAG, "settings_init returned: %s", esp_err_to_name(storage_result));
+    if (storage_result == ESP_OK) {
+        /* Count this boot once, after a complete EEPROM scan. Keep settings_init
+         * read-only; a failed save leaves the increment in RAM for an explicit retry. */
+        storage_result = settings_increment(SETTINGS_REBOOT_COUNT, 1);
+        if (storage_result == ESP_OK) storage_result = settings_commit();
+        ESP_LOGI(TAG, "Boot counter update/save: %s", esp_err_to_name(storage_result));
+    }
     if (storage_result != ESP_OK) {
-        ESP_LOGW(TAG, "Parameter storage initialization failed: %s",
+        ESP_LOGW(TAG, "Parameter storage startup failed: %s",
                  esp_err_to_name(storage_result));
     }
     boot_screen_complete(storage_result);
@@ -141,6 +154,10 @@ void app_main(void)
     ESP_LOGI(TAG, "ui_start begin");
     ui_start(display);
     ESP_LOGI(TAG, "ui_start done");
+    const esp_err_t film_reload_result = film_reload_start();
+    if (film_reload_result != ESP_OK) {
+        ESP_LOGW(TAG, "Film reload task start failed: %s", esp_err_to_name(film_reload_result));
+    }
     ESP_LOGI(TAG, "app_main initialization complete");
 
     TickType_t last_log_tick = xTaskGetTickCount();

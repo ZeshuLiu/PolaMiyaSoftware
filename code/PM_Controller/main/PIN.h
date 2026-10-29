@@ -17,7 +17,8 @@
 #define PIN_ADC_BAT          GPIO_NUM_3
 #define PIN_USBPWR_DET       GPIO_NUM_21
 
-/* Film-event latch: TRG is read through Q1; CLR drives Q2 via R11. */
+/* Film-event latch: TRG through Q1 is high when pending.
+ * CLR drives Q2 via R11; high acknowledges U3 through /PRE. */
 #define PIN_ESP_FILM_TRG     GPIO_NUM_6
 #define PIN_ESP_FILM_CLR     GPIO_NUM_7
 

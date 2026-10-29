@@ -27,6 +27,9 @@ typedef struct {
     uint8_t pressed;      /* Debounced KEY1..KEY6; 1 means pressed. */
     bool charging;       /* CHG is low in the latest sample. */
     bool charge_done;    /* STB is low in the latest sample. */
+    uint32_t charge_falls;       /* CHG falling edges retained by the 5 ms scanner. */
+    uint32_t charge_last_fall_ms;
+    uint8_t charge_short_periods; /* Consecutive 0.4..2.5 s CHG periods, max 2. */
 } hc165_inputs_t;
 
 /* Call once at startup. A background task owns GPIO39/40/41 thereafter. */

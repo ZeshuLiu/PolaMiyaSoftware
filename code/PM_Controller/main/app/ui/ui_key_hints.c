@@ -3,264 +3,135 @@
 
 #include <stdbool.h>
 
-#define ICON_COLOR          0xd8f5e7
-#define CANDIDATE_COLOR     0x4a6a5b
-#define SELECTED_COLOR      0xffa24d
-#define DONE_COLOR          0xb1ffd3
-#define ARROW_COLOR         0xbfd6c9
-#define ICON_X              157
+#define INK 0x09291e
+#define GREEN 0x79f5a7
+#define PALE 0xd4ffe7
+#define AMBER 0xffbe58
+#define CANDIDATE 0x386b4b
 
 enum { FUNC_SETTINGS, FUNC_FOCUS, FUNC_EJECT, FUNC_INFO, FUNC_COUNT };
-enum { PAGE_GEAR, PAGE_TUNE, PAGE_HOME_TOP, PAGE_HOME_BOTTOM,
-       PAGE_GEAR_TOP, PAGE_INFO_BOTTOM, PAGE_PLUS, PAGE_DONE, PAGE_MINUS,
-       PAGE_ICON_COUNT };
-
-typedef struct {
-    lv_obj_t *slot;
-    lv_obj_t *icons[FUNC_COUNT];
-} home_slot_t;
-
-static home_slot_t home_slots[3];
-static lv_obj_t *page_icons[PAGE_ICON_COUNT];
-static lv_obj_t *arrow_up;
-static lv_obj_t *arrow_down;
+static lv_obj_t *rail, *top_key, *bottom_key, *middle;
+static lv_obj_t *icons[3][FUNC_COUNT], *up, *down, *left, *right, *plus, *minus, *done, *stop;
 static int last_mode = -1;
 static unsigned last_func;
 static bool last_edit;
 
-static lv_obj_t *plain_object(lv_obj_t *parent, int x, int y, int width, int height)
+static lv_obj_t *box(lv_obj_t *parent, int x, int y, int w, int h, uint32_t color, int radius)
 {
     lv_obj_t *obj = lv_obj_create(parent);
     lv_obj_remove_style_all(obj);
     lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_pos(obj, x, y);
-    lv_obj_set_size(obj, width, height);
+    lv_obj_set_size(obj, w, h);
+    if (color) {
+        lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0);
+        lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(obj, radius, 0);
+    }
     return obj;
 }
 
-static lv_obj_t *stroke(lv_obj_t *parent, const lv_point_precise_t *points,
-                        unsigned count, int width, uint32_t color)
+static void show(lv_obj_t *obj, bool visible)
 {
-    /* Point arrays are static; LVGL retains their address. */
-    lv_obj_t *line = lv_line_create(parent);
-    lv_obj_remove_style_all(line);
-    lv_line_set_points(line, points, count);
-    lv_obj_set_style_line_color(line, lv_color_hex(color), 0);
-    lv_obj_set_style_line_width(line, width, 0);
-    lv_obj_set_style_line_rounded(line, true, 0);
-    lv_obj_remove_flag(line, LV_OBJ_FLAG_CLICKABLE);
-    return line;
+    lv_obj_set_flag(obj, LV_OBJ_FLAG_HIDDEN, !visible);
 }
 
-static void show_obj(lv_obj_t *obj, bool visible)
+static lv_obj_t *line(lv_obj_t *parent, const lv_point_precise_t *points, unsigned n)
 {
-    if (visible) {
-        lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
-    }
-}
-
-static void set_icon_color(lv_obj_t *obj, uint32_t color)
-{
-    /* Each HOME icon group contains one white alpha image. */
-    lv_obj_t *mask = lv_obj_get_child(obj, 0);
-    lv_obj_set_style_image_recolor(mask, lv_color_hex(color), 0);
-}
-
-static lv_obj_t *icon_image(lv_obj_t *parent, const lv_image_dsc_t *source,
-                             uint32_t color)
-{
-    lv_obj_t *obj = lv_image_create(parent);
+    lv_obj_t *obj = lv_line_create(parent);
     lv_obj_remove_style_all(obj);
-    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    lv_image_set_src(obj, source);
-    lv_obj_set_style_image_recolor(obj, lv_color_hex(color), 0);
-    lv_obj_set_style_image_recolor_opa(obj, LV_OPA_COVER, 0);
+    lv_line_set_points(obj, points, n);
+    lv_obj_set_style_line_color(obj, lv_color_hex(INK), 0);
+    lv_obj_set_style_line_width(obj, 3, 0);
+    lv_obj_set_style_line_rounded(obj, true, 0);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_CLICKABLE);
     return obj;
-}
-
-static lv_obj_t *create_icon_group(lv_obj_t *parent, int x, int y, int size,
-                                   unsigned func)
-{
-    const lv_image_dsc_t *current[] = {
-        &ui_icon_gear_current, &ui_icon_focus_current, &ui_icon_eject_current,
-        &ui_icon_info_current,
-    };
-    const lv_image_dsc_t *candidate[] = {
-        &ui_icon_gear_candidate, &ui_icon_focus_candidate, &ui_icon_eject_candidate,
-        &ui_icon_info_candidate,
-    };
-    lv_obj_t *group = plain_object(parent, x, y, size, size == 14 ? 14 : 12);
-    icon_image(group, size == 14 ? current[func] : candidate[func], ICON_COLOR);
-    return group;
-}
-
-static lv_obj_t *create_arrow(lv_obj_t *screen, int y, bool up)
-{
-    lv_obj_t *group = plain_object(screen, ICON_X, y, 14, 14);
-    icon_image(group, up ? &ui_icon_up : &ui_icon_down, ARROW_COLOR);
-    return group;
-}
-
-static lv_obj_t *create_tune(lv_obj_t *screen)
-{
-    lv_obj_t *group = plain_object(screen, ICON_X, 153, 14, 14);
-    static const lv_point_precise_t sliders[][2] = {
-        {{3, 2}, {3, 12}}, {{10, 2}, {10, 12}},
-        {{1, 5}, {5, 5}}, {{8, 9}, {12, 9}},
-    };
-    for (unsigned i = 0; i < sizeof(sliders) / sizeof(sliders[0]); ++i) {
-        stroke(group, sliders[i], 2, 2, ICON_COLOR);
-    }
-    return group;
-}
-
-static lv_obj_t *create_home(lv_obj_t *screen, int y)
-{
-    lv_obj_t *group = plain_object(screen, ICON_X, y, 14, 14);
-    static const lv_point_precise_t roof[] = {{1, 6}, {7, 1}, {13, 6}};
-    static const lv_point_precise_t walls[] = {
-        {3, 5}, {3, 12}, {6, 12}, {6, 8}, {9, 8}, {9, 12}, {11, 12}, {11, 5},
-    };
-    stroke(group, roof, 3, 1, ICON_COLOR);
-    stroke(group, walls, 8, 1, ICON_COLOR);
-    return group;
-}
-
-static lv_obj_t *create_plus(lv_obj_t *screen)
-{
-    lv_obj_t *group = plain_object(screen, ICON_X, 47, 14, 14);
-    static const lv_point_precise_t horizontal[] = {{3, 7}, {11, 7}};
-    static const lv_point_precise_t vertical[] = {{7, 3}, {7, 11}};
-    stroke(group, horizontal, 2, 2, ICON_COLOR);
-    stroke(group, vertical, 2, 2, ICON_COLOR);
-    return group;
-}
-
-static lv_obj_t *create_minus(lv_obj_t *screen)
-{
-    lv_obj_t *group = plain_object(screen, ICON_X, 259, 14, 14);
-    static const lv_point_precise_t horizontal[] = {{3, 7}, {11, 7}};
-    stroke(group, horizontal, 2, 2, ICON_COLOR);
-    return group;
-}
-
-static lv_obj_t *create_done(lv_obj_t *screen)
-{
-    lv_obj_t *group = plain_object(screen, ICON_X, 153, 14, 14);
-    static const lv_point_precise_t check[] = {{3, 7}, {6, 10}, {11, 4}};
-    stroke(group, check, 3, 2, DONE_COLOR);
-    return group;
-}
-
-static void create_edge_fade(lv_obj_t *screen)
-{
-    /* Includes the original 17 px rail and its two separators, without
-     * separately approximating subpixel strokes or gradient colours. */
-    lv_obj_t *rail = lv_image_create(screen);
-    lv_obj_remove_style_all(rail);
-    lv_obj_remove_flag(rail, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
-    lv_image_set_src(rail, &ui_key_rail);
-    lv_obj_set_pos(rail, 155, 20);
 }
 
 void ui_key_hints_create(lv_obj_t *screen)
 {
-    create_edge_fade(screen);
-
-    arrow_up = create_arrow(screen, 47, true);
-    arrow_down = create_arrow(screen, 259, false);
-
-    const int slot_x[] = {158, 157, 158};
-    const int slot_y[] = {112, 153, 196};
-    const int slot_size[] = {11, 14, 11};
-    for (unsigned i = 0; i < 3; ++i) {
-        home_slots[i].slot = plain_object(screen, slot_x[i], slot_y[i],
-                                          slot_size[i], i == 1 ? 14 : 12);
-        for (unsigned f = 0; f < FUNC_COUNT; ++f) {
-            home_slots[i].icons[f] = create_icon_group(home_slots[i].slot, 0, 0,
-                                                       slot_size[i], f);
-            show_obj(home_slots[i].icons[f], false);
+    rail = box(screen, 136, 32, 36, 274, PALE, 4);
+    top_key = box(rail, 4, 6, 28, 34, 0x9ce8ba, 3);
+    bottom_key = box(rail, 4, 218, 28, 34, 0x9ce8ba, 3);
+    box(rail, 6, 52, 24, 1, 0x78ad8a, 0);
+    box(rail, 6, 212, 24, 1, 0x78ad8a, 0);
+    middle = box(rail, 3, 110, 30, 44, INK, 3);
+    static const lv_point_precise_t up_points[] = {{7,20},{14,13},{21,20}};
+    static const lv_point_precise_t down_points[] = {{7,13},{14,20},{21,13}};
+    static const lv_point_precise_t right_points[] = {{10,10},{17,17},{10,24}};
+    static const lv_point_precise_t left_points[] = {{18,10},{11,17},{18,24}};
+    static const lv_point_precise_t h[] = {{7,17},{21,17}};
+    static const lv_point_precise_t v[] = {{14,10},{14,24}};
+    static const lv_point_precise_t check[] = {{6,21},{13,28},{24,15}};
+    up=line(top_key,up_points,3); down=line(bottom_key,down_points,3);
+    right=line(top_key,right_points,3); left=line(bottom_key,left_points,3);
+    plus=box(top_key,0,0,28,34,0,0); line(plus,h,2); line(plus,v,2);
+    minus=line(bottom_key,h,2); done=line(middle,check,3);
+    const lv_image_dsc_t *images[] = {&ui_icon_gear_current, &ui_icon_focus_current,
+                                       &ui_icon_eject_current, &ui_icon_info_current};
+    /* Center the three-icon group between separators y=84/244.
+     * Icon centers are y=120/164/208, 44 px apart. */
+    const int ys[] = {77, 121, 165};
+    for (unsigned slot=0; slot<3; ++slot) {
+        for (unsigned f=0; f<FUNC_COUNT; ++f) {
+            lv_obj_t *img=lv_image_create(rail);
+            lv_obj_remove_style_all(img);
+            lv_obj_remove_flag(img, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+            lv_obj_set_pos(img, 7, ys[slot]);
+            lv_image_set_src(img, images[f]);
+            lv_obj_set_style_image_recolor(img, lv_color_hex(slot==1 ? GREEN : CANDIDATE), 0);
+            lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
+            icons[slot][f]=img;
         }
-        show_obj(home_slots[i].slot, false);
     }
+    /* EJECT has its own narrow rail and a stop control at KEY2. */
+    stop=box(screen,159,155,10,10,0,1);
+    lv_obj_set_style_border_color(stop,lv_color_hex(INK),0);
+    lv_obj_set_style_border_width(stop,2,0);
+    last_mode=-1;
+}
 
-    page_icons[PAGE_GEAR] = create_icon_group(screen, ICON_X, 153, 14,
-                                              FUNC_SETTINGS);
-    page_icons[PAGE_HOME_TOP] = create_home(screen, 47);
-    page_icons[PAGE_HOME_BOTTOM] = create_home(screen, 259);
-    page_icons[PAGE_GEAR_TOP] = create_icon_group(screen, ICON_X, 47, 14,
-                                                  FUNC_SETTINGS);
-    page_icons[PAGE_INFO_BOTTOM] = create_icon_group(screen, ICON_X, 259, 14,
-                                                     FUNC_INFO);
-    page_icons[PAGE_TUNE] = create_tune(screen);
-    page_icons[PAGE_PLUS] = create_plus(screen);
-    page_icons[PAGE_DONE] = create_done(screen);
-    page_icons[PAGE_MINUS] = create_minus(screen);
-    for (unsigned i = 0; i < PAGE_ICON_COUNT; ++i) {
-        show_obj(page_icons[i], false);
-    }
+static void reset(void)
+{
+    show(rail,true); show(stop,false);
+    show(up,false); show(down,false); show(left,false); show(right,false);
+    show(plus,false); show(minus,false); show(done,false);
+    for(unsigned i=0;i<3;++i) for(unsigned f=0;f<FUNC_COUNT;++f) show(icons[i][f],false);
+}
 
-    last_mode = -1;
+static void center(unsigned func, bool editing)
+{
+    lv_obj_set_style_bg_color(middle,lv_color_hex(editing ? AMBER : INK),0);
+    if(editing) show(done,true); else show(icons[1][func],true);
 }
 
 void ui_key_hints_home(unsigned current, bool editing)
 {
-    if (current >= FUNC_COUNT) current = FUNC_FOCUS;
-    if (last_mode == 0 && last_func == current && last_edit == editing) return;
-    last_mode = 0;
-    last_func = current;
-    last_edit = editing;
-
-    const bool navigation = !(current == FUNC_EJECT && editing);
-    show_obj(arrow_up, navigation);
-    show_obj(arrow_down, navigation);
-    for (unsigned i = 0; i < PAGE_ICON_COUNT; ++i) {
-        show_obj(page_icons[i], false);
-    }
-
-    const unsigned previous = (current + FUNC_COUNT - 1) % FUNC_COUNT;
-    const unsigned next = (current + 1) % FUNC_COUNT;
-    for (unsigned i = 0; i < 3; ++i) {
-        show_obj(home_slots[i].slot, true);
-        const unsigned active = i == 0 ? previous : i == 1 ? current : next;
-        for (unsigned f = 0; f < FUNC_COUNT; ++f) {
-            show_obj(home_slots[i].icons[f], f == active);
-        }
-        set_icon_color(home_slots[i].icons[active],
-                       i == 1 ? (editing ? SELECTED_COLOR : ICON_COLOR)
-                              : CANDIDATE_COLOR);
+    if(current>=FUNC_COUNT) current=FUNC_FOCUS;
+    if(last_mode==0 && last_func==current && last_edit==editing) return;
+    last_mode=0; last_func=current; last_edit=editing;
+    reset();
+    center(current,editing);
+    if(editing) { show(plus,true); show(minus,true); }
+    else {
+        show(up,true); show(down,true);
+        show(icons[0][(current+FUNC_COUNT-1)%FUNC_COUNT],true);
+        show(icons[2][(current+1)%FUNC_COUNT],true);
     }
 }
 
 void ui_key_hints_page(bool setup_page, bool editing)
 {
-    const int mode = setup_page ? (editing ? 3 : 2) : 1;
-    if (last_mode == mode) return;
-    last_mode = mode;
+    int mode=setup_page ? (editing ? 3 : 2) : 1;
+    if(last_mode==mode) return;
+    last_mode=mode; reset();
+    center(FUNC_SETTINGS,editing);
+    if(editing) { show(plus,true); show(minus,true); }
+    else { show(right,true); show(left,true); }
+}
 
-    show_obj(arrow_up, false);
-    show_obj(arrow_down, false);
-
-    for (unsigned i = 0; i < 3; ++i) {
-        show_obj(home_slots[i].slot, false);
-    }
-    for (unsigned i = 0; i < PAGE_ICON_COUNT; ++i) {
-        show_obj(page_icons[i], false);
-    }
-
-    if (!setup_page) {
-        show_obj(page_icons[PAGE_GEAR], true);
-        show_obj(page_icons[PAGE_GEAR_TOP], true);
-        show_obj(page_icons[PAGE_HOME_BOTTOM], true);
-    } else if (!editing) {
-        show_obj(page_icons[PAGE_TUNE], true);
-        show_obj(page_icons[PAGE_HOME_TOP], true);
-        show_obj(page_icons[PAGE_INFO_BOTTOM], true);
-    } else {
-        show_obj(page_icons[PAGE_PLUS], true);
-        show_obj(page_icons[PAGE_DONE], true);
-        show_obj(page_icons[PAGE_MINUS], true);
-    }
+void ui_key_hints_eject(void)
+{
+    if(last_mode==4) return;
+    last_mode=4; show(rail,false); show(stop,true);
 }

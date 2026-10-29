@@ -1,14 +1,22 @@
 # PM_Controller 固件
 
+2026-10-20 充电显示：新增 USB GPIO21 读取和 CHG/STB 组合状态；HC165 的 5 ms 扫描保留 CHG 脉冲历史，UI 持续观察并做稳定判断。HOME / EJECT 共用普通电量、充电动画、充满对勾、无电池斜杠与待确认问号；充满对勾按预览上移 1 px。INFO 显示对应状态。双高不直接判定无电池，重复脉冲满足条件才显示无电池；整板负载下的实际特征待实测。不新增任务、定时器或整屏图片，未编译、测试或烧录。见 [充电状态](main/app/charge_status/README.md)。
+
+2026-10-20 相纸余量：新增 EEPROM 参数 ID 5（0–8），开机读取保存值，旧记录缺项默认 6。FILM_KEY 延时恢复成功后设为 8 并保存；每次吐片从首次启动到最终停止斜坡目标结束严格超过 5 s 时扣 1 张，最低 0，完成后写 EEPROM。中途反向切换仍视为同一次动作。相纸自动保存只提交此字段，不保存尚未确认的背光修改；失败由低优先级任务每秒重试当前值，不重复扣减。保留记录格式、CRC 和轮换机制，未编译、测试或烧录，实机未验证。
+
+2026-10-20 FILM_KEY：新增优先级 1 的低优先级任务，每秒读取 GPIO6，发现事件后等待约 10 s；GPIO7 发出至少 100 ms 高脉冲恢复锁存，读回成功后将剩余相纸设为 8。初始化不清除旧事件；失败记录日志，余量不变，并继续轮询重试。任务通过参数服务更新并保存相纸数量，UI 线程负责显示；不控制吐片电机。GPIO 驱动及应用分别见 [film_latch](main/drivers/film_latch/README.md) / [film_reload](main/app/film_reload/README.md)。未编译、测试或烧录，实机未验证。
+
+2026-10-20 统计修正：重启计数此前只有参数字段和 INFO 显示，没有递增调用；现由 `app_main()` 在参数加载成功后加 1 并提交一次。加载失败不累计或写入，提交失败保留 RAM 增量供显式保存重试。`settings_init()` 保持只读，EEPROM 布局不变。INFO 电机累计工作时长改为整秒加 `s` 显示，存储仍为毫秒；电机时长和快门计数的业务累计尚未接入。未编译、测试或烧录，实机未验证。
+
+2026-10-20：EJECT 已改为独立页面，启动成功后隐藏 HOME，显示绿色主体、黑色顶栏、本次吐片计时和实时电流圆环。小于 1 A 显示 `.xxx`，底部为放大的循环吐片动画，无 EJECTING / PRESS TO STOP。2026-10-25 已取消页面渐变：启动成功直接进入，停止成功直接返回 HOME；电机仍保留 1 s 启停斜坡，相纸在停止斜坡目标结束后结算；上下键不操作。只刷新当前页，沿用 50 ms UI 周期，无新任务、GIF 或整屏位图；SDK 配置和电机驱动未改动。源码、资源及设计预览已更新，未编译、测试或烧录，实屏未验证。详见 [UI 说明](main/app/ui/README.md)。
+
 2026-10-19 全量保存工作区：同步 HOME 上下双距离布局、移除时域曲线、字形与图标资源、设计源及预览；一并收录已有 `sdkconfig.defaults` 的 Montserrat 8/10/12 字号开关，不改动本机 `sdkconfig`。本轮未代为编译、测试或烧录，当前布局实屏效果仍待确认。
 
 2026-10-19 吐片电机：HOME 增加 EJECT，KEY2 选中运转、再短按取消选中并停止；运行时保持此选项，上下键无操作。GPIO1 反向 PWM、GPIO2 恒高，20 kHz，运行目标为 GPIO1 实际高电平占比 0%（全驱动）；启停均为目标 1 s 的非阻塞硬件斜坡，停止斜坡结束后双高制动。启动先初始化为制动，使用独立 LEDC Timer 1 / Channel 1。用户实机确认启动冲转及随后约半速的问题来自驱动芯片限流，解除电流限制后运行正常；保留斜坡逻辑和启停占空比、频率日志，具体解除方式及采样有效性待记录。仅接入手动启停，自动吐片流程、事件锁存及计数尚未接入；本轮未代为编译、测试或烧录。见 [吐片电机](main/drivers/film_motor/README.md)。
 
 2026-10-19 开机显示：先预置闪光输出低电平，再初始化 ST7789/LVGL 并显示白底黑狗圆角图、逐行启动日志与 `MAC : [出厂MAC]`。狗图上移到 y=48，日志采用 9 px Roboto Mono Medium、20 px 行距和对齐的状态标记。开机图像仅保留 RGB565 小标题与 A8 狗图，其余形状由 LVGL 绘制；启动字体按需导出字符，图像和字形像素比整屏位图版减少约 103.7 KiB，最终固件变化待手动编译确认。随后初始化触发输入输出、按键、测距、存储和 ADC，完成后进入原 UI。可继续启动的失败显示警告，详情见 [开机画面说明](main/app/boot_screen/README.md)。本轮未编译、未测试、未烧录。
 
-2026-10-19：HOME 已取消时域曲线，改为上 FOCUS、下 ACTUAL 两块独立读数。数字恢复 Space Mono Bold 48 px，小数点单独收窄为 12 px 步距；其余文字使用 Roboto Mono。右侧栏和 SETTINGS / FOCUS / EJECT / INFO 按键业务保留，顶部无 PolaMiya 文字。已删除 lv_chart、历史数组和采样刷新逻辑，底部保留即时距离标尺、胶片余量和运行时间。字体来源及两份 OFL 1.1 许可见 [字体许可](THIRD_PARTY_NOTICES.md)。本轮未修改 SDK 配置、未编译、测试或烧录，详见 [UI 说明](main/app/ui/README.md)。
-
-当前显示：顶部五色标记和电池；两组距离在 132 px 宽区域内分别居中，Space Mono 数字步距 29 px，小数点步距 12 px，m 单位 16 px，间隔 6 px。FOCUS / ACTUAL 标签为 14 px，INF / NEAR / 无效横杠为 30 px，不带单位。1 m 以下 .xxm，其余近距一位小数、远距整数米。即时标尺在 y=218.5，FILM / UPTIME 基线 y=258/309。未编译、未上板验证。
+2026-10-29：HOME 上方为深蓝 ACTUAL 实测卡，下方为鲜绿 FOCUS 对焦卡，距离使用 Space Mono Bold 50 px；保留距离状态、即时对数标尺和相纸余量，UPTIME 移至 INFO。两标题共用 Roboto Mono Bold 14 px，HOME 电池主体位于 x=143；HOME / INFO / SETUP 采用 36 px 纯图标侧栏，INFO / SETUP 横向切页提示使用左右箭头；独立 EJECT 保留窄侧栏。设计及动态资源已更新，未编译、测试或烧录，实屏待验证。详见 [UI 说明](main/app/ui/README.md)。
 
 2026-10-19 历史资源精简记录（本次重排前）：追溯到 `448b0f7` 引入的整屏背景与九张胶片条，改为保留原像素的窄条和亮 / 暗单张素材，布局及 0–8 张胶片显示保持。继开机画面优化后，主界面背景与胶片像素再减少 132048 字节（约 129.0 KiB）；所有生成图像和字形像素合计约 67.4 KiB，不含描述表及代码。未修改编译优化、SDK 配置或字体现有外观；本轮未编译、未上板验证。详细统计见 [UI 说明](main/app/ui/README.md)。
 
@@ -18,7 +26,7 @@
 
 对应 PCB：PM_Controller Rev2.x，当前为 Rev2.0。模组：ESP32-S3-WROOM-1-N8R8，8 MB Flash、8 MB Octal PSRAM。开发环境为 ESP-IDF 6.1。当前 FreeRTOS tick 为 1 kHz（`CONFIG_FREERTOS_HZ=1000`）；按键扫描目标周期 5 ms，EEPROM 忙等待延时为 1 tick。消抖、长按、LVGL 定时与 GPTimer 目标脉宽仍按各自的时间单位配置。
 
-`app_main()` 先将闪光输出预置低电平、初始化吐片电机为制动，再完成屏幕和开机画面。随后创建闪光定时器、接入 GPIO42 快门下降沿中断、启动 74HC165 扫描、初始化测距、加载 24C64 参数并启动 ADC，逐阶段追加状态行，最后进入三页 UI。HOME 使用 KEY1–KEY3 滚动功能列表和执行/调参；INFO/SETUP 使用 KEY1–KEY3 页面导航、背光调节和显式保存，上下导航键显示目标页面图标。INFO 数值不滚动，较长时缩小字号完整显示。KEY4–KEY6 暂未接入业务。主程序每 1 s 打印测距及 ADC/电源快照。参数修改与持久化提交分开。引脚和双 OTA 分区已整理；电机已接手动启停，自动吐片、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
+`app_main()` 先将闪光输出预置低电平、初始化吐片电机为制动，再完成屏幕和开机画面。随后创建闪光定时器、接入 GPIO42 快门下降沿中断、启动 74HC165 扫描、初始化测距、加载 24C64 参数并启动 ADC，逐阶段追加状态行，最后进入三页 UI。HOME 使用 KEY1–KEY3 滚动功能列表和执行/调参；INFO/SETUP 使用 KEY1–KEY3 页面导航、背光调节和显式保存，横向切页显示左右箭头。INFO 数值不滚动，较长时缩小字号完整显示。KEY4–KEY6 暂未接入业务。主程序每 1 s 打印测距及 ADC/电源快照。参数修改与持久化提交分开。引脚和双 OTA 分区已整理；电机已接手动启停，自动吐片、蓝牙、Wi-Fi 和 OTA 业务尚未接入。
 
 2026-10-07：按用户要求移除本地主机测试、桩及测试缓存，保留固件内的屏幕方向与偏移测试。下文主机测试结果为清理前的验证记录。
 
@@ -44,12 +52,16 @@
 | [main/drivers/sdm50/](main/drivers/sdm50/README.md) | UART1/UHCI DMA 测距、中断更新结果和启停应答 |
 | [main/drivers/adc_measure/](main/drivers/adc_measure/README.md) | ADC1 最低速连续 DMA、两路校准与滤波快照 |
 | [main/app/shutter/](main/app/shutter/) | GPIO42 快门下降沿 ISR 直接触发闪光 |
+| [main/drivers/film_latch/](main/drivers/film_latch/README.md) | FILM_KEY 锁存输入、恢复脉冲及读回确认 |
+| [main/app/film_reload/](main/app/film_reload/README.md) | 优先级 1、约 10 s 后恢复锁存并把相纸余量设为 8 |
 | [main/app/settings/](main/app/settings/README.md) | 参数定义、RAM 缓存、CRC、轮换保存与旧版导入 |
 | [main/app/display/](main/app/display/) | 官方 esp_lvgl_port 初始化和显示配置 |
 | [main/app/boot_screen/](main/app/boot_screen/) | 狗图、逐行启动状态和出厂 MAC；完成后交给原 UI |
 | [main/app/ui/](main/app/ui/README.md) | CASE 7 竖屏 UI、测距曲线、KEY1–3 菜单及背光设置 |
 | [main/app/focus_distance/](main/app/focus_distance/README.md) | 对焦物距获取接口；当前借用实测距离，等待 FocusUnit 通信和位置标定 |
 | [main/app/power_monitor/](main/app/power_monitor/README.md) | 电池电压、单节锂电池电量估算和 IPROPI 电流换算 |
+| [main/drivers/usb_power/](main/drivers/usb_power/README.md) | GPIO21 / TPS3808 有效外电检测 |
+| [main/app/charge_status/](main/app/charge_status/README.md) | CHG/STB、USB 和脉冲历史组合判定充电、充满、无电池和待确认 |
 | [main/app/lcd_test/](main/app/lcd_test/) | LVGL 测试控件和定时切换 |
 | [main/idf_component.yml](main/idf_component.yml) | 固定官方移植组件和 LVGL 版本 |
 | [partitions.csv](partitions.csv) | 8 MB Flash 自定义分区表 |
@@ -106,7 +118,7 @@
 
 ## 显示屏
 
-2026-10-18：右侧按上 KEY3、中 KEY2、下 KEY1 显示图标，随浏览/编辑切换；16 px 提示区和淡化渐变背景代替文字按键提示，顶部区域收至 30 px，电池主体 19×10 px。按键统一为 KEY3 上/右/增加、KEY1 下/左/减少、KEY2 确认/执行；图标高度为示意位置，字体、渐变与实物对齐待用户上板确认，本轮未编译、未测试、未烧录。
+历史记录，2026-10-18：右侧按上 KEY3、中 KEY2、下 KEY1 显示图标，随浏览/编辑切换；16 px 提示区和淡化渐变背景代替文字按键提示，顶部区域收至 30 px，电池主体 19×10 px。按键统一为 KEY3 上/右/增加、KEY1 下/左/减少、KEY2 确认/执行；图标高度为示意位置，字体、渐变与实物对齐待用户上板确认，本轮未编译、未测试、未烧录。
 
 ADC 已接入：GPIO3 电池电压、GPIO8 电机 IPROPI，使用官方连续 DMA 和 curve-fitting 校准，按 SDK 最低总采样率 611 Hz、两路交替约各 305.5 Hz；每路 31 样本生成约 100 ms 快照。主屏图标与 INFO 电压/估算电量、电机 mA/IPROPI mV 已接实际 ADC 快照；百分比按用户确认的单节 4.2 V 锂电池通用电压节点估算，未做电芯标定。未实现低压关机、过流或堵转保护。初始化失败时保留界面并显示未知。实现及误差边界见 [电源读数](main/app/power_monitor/README.md)，本轮未编译、未测试、未烧录。
 

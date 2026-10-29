@@ -11,6 +11,7 @@ typedef enum {
     SETTINGS_SHUTTER_COUNT = 2,
     SETTINGS_MOTOR_RUN_MS = 3,
     SETTINGS_BACKLIGHT_PERCENT = 4,
+    SETTINGS_FILM_REMAINING = 5,
 } settings_key_t;
 
 typedef struct {
@@ -18,6 +19,7 @@ typedef struct {
     uint64_t shutter_count;
     uint64_t motor_run_ms;
     uint64_t backlight_percent;
+    uint64_t film_remaining;
 } settings_values_t;
 
 typedef struct {
@@ -37,6 +39,11 @@ esp_err_t settings_get_status(settings_status_t *status);
 esp_err_t settings_set(settings_key_t key, uint64_t value);
 esp_err_t settings_increment(settings_key_t key, uint64_t amount);
 esp_err_t settings_commit(void);
+/* Persist only film_remaining; leave other uncommitted RAM parameters untouched. */
+esp_err_t settings_commit_film(void);
+/* Saturating one-shot decrement and film-only save under the same parameter lock.
+ * On a write failure retry commit_film(), never this decrement. */
+esp_err_t settings_consume_film(void);
 
 /* Explicitly import Rev1 version-2 bytes at 0x20 into RAM; then call commit. */
 esp_err_t settings_import_rev1(void);

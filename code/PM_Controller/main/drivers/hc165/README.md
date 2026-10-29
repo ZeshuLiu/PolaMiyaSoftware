@@ -1,5 +1,7 @@
 # 74HC165 按键驱动
 
+2026-10-20：既有 5 ms 扫描增加 CHG 下降沿总数、最后时间及连续短周期计数，随 `hc165_get_inputs()` 快照提供；初始化时只记录电平，不虚构边沿。保留边沿历史供 [charge_status](../../app/charge_status/README.md) 识别无电池脉冲，即使 UI 刷新或 EEPROM 写入期间也不依赖 UI 捕获每个低脉冲。按键消抖、事件规则与唯一消费者不变。原始 `charging` / `charge_done` 仍只表示当前低电平，不能直接当作最终电池状态。未编译、测试或烧录，实际脉宽与采样覆盖待验证。
+
 对应 PM_Controller Rev2.0 的 U6。`hc165_init()` 已加入 `app_main()`，只在启动时调用一次。后台扫描任务独占 SPI3 和 GPIO39、GPIO40、GPIO41，不占用屏幕的 SPI2。
 
 ## 接线与时序

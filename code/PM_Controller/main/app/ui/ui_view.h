@@ -6,8 +6,11 @@
 #include "settings.h"
 #include "focus_distance.h"
 #include "power_monitor.h"
+#include "charge_status.h"
 
-enum { UI_HOME, UI_INFO, UI_SETUP, UI_PAGE_COUNT };
+enum { UI_HOME, UI_INFO, UI_SETUP, UI_EJECT, UI_PAGE_COUNT };
+/* EJECT is entered only by starting the motor, not by INFO/SETUP navigation. */
+enum { UI_NAV_PAGE_COUNT = UI_EJECT };
 
 /* HOME middle-key list order: SETTINGS -> FOCUS -> EJECT -> INFO -> SETTINGS. */
 enum {
@@ -21,9 +24,9 @@ enum {
 /* Internal layout API. Caller holds lvgl_port_lock for every call. */
 void ui_view_create(lv_display_t *display);
 void ui_view_show(unsigned page);
-/* -1 means unknown; otherwise 0..100 percent. */
-void ui_view_battery(int percent);
-void ui_view_power(const power_sample_t *sample);
+/* Update only the independent EJECT page, using actual motor current and elapsed time. */
+void ui_view_eject(uint64_t elapsed_ms, const power_sample_t *sample);
+void ui_view_power(const power_sample_t *sample, battery_status_t battery, uint32_t now_ms);
 void ui_view_range(const focus_distance_t *focus, const sdm50_sample_t *actual);
 /* Dim the focused distance while the parameter blink phase is off. */
 void ui_view_focus_blink(bool visible);

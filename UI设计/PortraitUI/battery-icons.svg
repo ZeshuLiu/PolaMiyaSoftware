@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="172" height="70" viewBox="0 0 172 70">
+<title>Battery masks: approved charging, raised full check and absent slash</title>
+<defs>
+  <g id="battery-frame" fill="none" stroke="white" stroke-width=".9">
+    <rect x=".45" y=".45" width="18.1" height="9.1" rx="1.25"/>
+    <path d="M20.85 3v4" stroke-width="1.7"/>
+  </g>
+  <g id="battery-bolt" fill="white"><path d="M2.2 0L0 5.6H1.76L.92 10L4 4H2.2Z"/></g>
+  <g id="battery-check" fill="white" transform="translate(7.9 1.7) rotate(45 1.3 2.3)">
+    <path d="M1.6 0H2.6V4.6H0V3.6H1.6Z"/>
+  </g>
+  <g id="battery-slash" fill="white" transform="translate(8.9 1) rotate(40 .6 4)">
+    <rect width="1.2" height="8"/>
+  </g>
+</defs>
+<rect width="172" height="70" fill="#080b0c"/>
+<use href="#battery-frame" x="12" y="12"/>
+<use href="#battery-bolt" x="45" y="12"/>
+<use href="#battery-check" x="69" y="12"/>
+<use href="#battery-slash" x="103" y="12"/>
+</svg>

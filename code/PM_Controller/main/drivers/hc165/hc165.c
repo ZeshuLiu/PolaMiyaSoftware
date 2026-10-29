@@ -24,6 +24,8 @@ static DMA_ATTR uint8_t spi_rx[4];
 static TaskHandle_t scan_task;
 static hc165_keys_state_t keys;
 static hc165_inputs_t inputs;
+static bool charge_sample_seen;
+static bool charge_fall_seen;
 static hc165_key_events_t pending_events;
 static portMUX_TYPE state_lock = portMUX_INITIALIZER_UNLOCKED;
 
@@ -50,13 +52,26 @@ static uint8_t read_parallel_inputs(void)
     return spi_rx[0];
 }
 
-static void publish_inputs(uint8_t raw, hc165_key_events_t events)
+static void publish_inputs(uint8_t raw, hc165_key_events_t events, uint32_t now_ms)
 {
     const uint8_t pressed = hc165_keys_pressed(&keys);
     portENTER_CRITICAL(&state_lock);
+    const bool charging = (raw & HC165_INPUT_CHG) == 0;
+    if (charge_sample_seen && charging && !inputs.charging) {
+        const uint32_t period = now_ms - inputs.charge_last_fall_ms;
+        if (charge_fall_seen && period >= 400 && period <= 2500) {
+            if (inputs.charge_short_periods < 2) ++inputs.charge_short_periods;
+        } else {
+            inputs.charge_short_periods = 0;
+        }
+        ++inputs.charge_falls;
+        inputs.charge_last_fall_ms = now_ms;
+        charge_fall_seen = true;
+    }
+    charge_sample_seen = true;
     inputs.raw = raw;
     inputs.pressed = pressed;
-    inputs.charging = (raw & HC165_INPUT_CHG) == 0;
+    inputs.charging = charging;
     inputs.charge_done = (raw & HC165_INPUT_STB) == 0;
     pending_events.short_press |= events.short_press;
     pending_events.long_press |= events.long_press;
@@ -69,7 +84,7 @@ static void scan_once(void)
     const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
     const uint8_t previous_pressed = hc165_keys_pressed(&keys);
     const hc165_key_events_t events = hc165_keys_update(&keys, raw, now_ms);
-    publish_inputs(raw, events);
+    publish_inputs(raw, events, now_ms);
 
     const uint8_t pressed = hc165_keys_pressed(&keys);
     const uint8_t changed = previous_pressed ^ pressed;
@@ -137,7 +152,7 @@ void hc165_init(void)
     const uint8_t raw = read_parallel_inputs();
     const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
     hc165_keys_init(&keys, raw, now_ms);
-    publish_inputs(raw, (hc165_key_events_t){0});
+    publish_inputs(raw, (hc165_key_events_t){0}, now_ms);
 
     const BaseType_t created = xTaskCreate(scan_inputs, "hc165_scan", HC165_TASK_STACK_BYTES,
                                           NULL, HC165_TASK_PRIORITY, &scan_task);
