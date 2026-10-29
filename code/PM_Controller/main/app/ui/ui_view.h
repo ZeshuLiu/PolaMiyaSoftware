@@ -35,6 +35,7 @@ void ui_view_film(unsigned remaining);
 void ui_view_uptime(uint64_t seconds);
 void ui_view_info(const settings_values_t *values, const settings_status_t *status,
                   bool available);
+void ui_view_focus_info(const focus_distance_t *focus, const focus_unit_snapshot_t *snapshot);
 void ui_view_settings(unsigned percent, bool editing, const char *message);
 /* Update the right-hand key hints for HOME or the INFO/SETUP pages. */
 void ui_view_key_hints(unsigned page, unsigned home_func, bool home_selected,

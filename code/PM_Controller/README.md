@@ -16,7 +16,9 @@
 
 2026-10-19 开机显示：先预置闪光输出低电平，再初始化 ST7789/LVGL 并显示白底黑狗圆角图、逐行启动日志与 `MAC : [出厂MAC]`。狗图上移到 y=48，日志采用 9 px Roboto Mono Medium、20 px 行距和对齐的状态标记。开机图像仅保留 RGB565 小标题与 A8 狗图，其余形状由 LVGL 绘制；启动字体按需导出字符，图像和字形像素比整屏位图版减少约 103.7 KiB，最终固件变化待手动编译确认。随后初始化触发输入输出、按键、测距、存储和 ADC，完成后进入原 UI。可继续启动的失败显示警告，详情见 [开机画面说明](main/app/boot_screen/README.md)。本轮未编译、未测试、未烧录。
 
-2026-10-29：HOME 上方为深蓝 ACTUAL 实测卡，下方为鲜绿 FOCUS 对焦卡，距离使用 Space Mono Bold 50 px；保留距离状态、即时对数标尺和相纸余量，UPTIME 移至 INFO。两标题共用 Roboto Mono Bold 14 px，HOME 电池主体位于 x=143；HOME / INFO / SETUP 采用 36 px 纯图标侧栏，INFO / SETUP 横向切页提示使用左右箭头；独立 EJECT 保留窄侧栏。设计及动态资源已更新，未编译、测试或烧录，实屏待验证。详见 [UI 说明](main/app/ui/README.md)。
+2026-10-29：FOCUS 按 1000 RAW 步进发送 FocusUnit MoveRaw，显示 RAW / 100000 两位小数，m 仅为未标定占位；INFO 显示设备状态和位置。通信、寻零及定位仍待实机验证。
+
+2026-10-29：HOME 上方为深蓝 ACTUAL 实测卡，下方为鲜绿 FOCUS 对焦卡，距离使用 Space Mono Bold 50 px；保留距离状态、即时对数标尺和相纸余量，UPTIME 移至 INFO。两标题共用 Roboto Mono Bold 16 px，HOME 电池主体位于 x=143；HOME / INFO / SETUP 采用 36 px 纯图标侧栏，INFO / SETUP 横向切页提示使用左右箭头；独立 EJECT 保留窄侧栏。设计及动态资源已更新，未编译、测试或烧录，实屏待验证。详见 [UI 说明](main/app/ui/README.md)。
 
 2026-10-19 历史资源精简记录（本次重排前）：追溯到 `448b0f7` 引入的整屏背景与九张胶片条，改为保留原像素的窄条和亮 / 暗单张素材，布局及 0–8 张胶片显示保持。继开机画面优化后，主界面背景与胶片像素再减少 132048 字节（约 129.0 KiB）；所有生成图像和字形像素合计约 67.4 KiB，不含描述表及代码。未修改编译优化、SDK 配置或字体现有外观；本轮未编译、未上板验证。详细统计见 [UI 说明](main/app/ui/README.md)。
 
@@ -58,7 +60,8 @@
 | [main/app/display/](main/app/display/) | 官方 esp_lvgl_port 初始化和显示配置 |
 | [main/app/boot_screen/](main/app/boot_screen/) | 狗图、逐行启动状态和出厂 MAC；完成后交给原 UI |
 | [main/app/ui/](main/app/ui/README.md) | CASE 7 竖屏 UI、测距曲线、KEY1–3 菜单及背光设置 |
-| [main/app/focus_distance/](main/app/focus_distance/README.md) | 对焦物距获取接口；当前借用实测距离，等待 FocusUnit 通信和位置标定 |
+| [main/drivers/focus_unit/](main/drivers/focus_unit/README.md) | FocusUnit UART2 状态查询与 MoveRaw 目标命令 |
+| [main/app/focus_distance/](main/app/focus_distance/README.md) | 对焦 RAW 目标与状态显示；物距标定待接入 |
 | [main/app/power_monitor/](main/app/power_monitor/README.md) | 电池电压、单节锂电池电量估算和 IPROPI 电流换算 |
 | [main/drivers/usb_power/](main/drivers/usb_power/README.md) | GPIO21 / TPS3808 有效外电检测 |
 | [main/app/charge_status/](main/app/charge_status/README.md) | CHG/STB、USB 和脉冲历史组合判定充电、充满、无电池和待确认 |

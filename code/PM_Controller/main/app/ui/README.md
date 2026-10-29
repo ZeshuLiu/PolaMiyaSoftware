@@ -8,7 +8,7 @@
 
 ## HOME 布局
 
-- 172×320；顶部为五色标记和实时电池；HOME 电池主体 x=143，EJECT 保留原位置。实测卡 (8,32) 120×90，深蓝底亮蓝字；对焦卡 (8,130) 120×85，鲜绿底深字。FOCUS 编辑时下方卡变橙色，读数闪烁。两标题均为同一个 LVGL `ui_font_body_bold`（Roboto Mono Bold 14 px）；两组距离与 m 单位仍分别共用同一字体。
+- 172×320；顶部为五色标记和实时电池；HOME 电池主体 x=143，EJECT 保留原位置。实测卡 (8,32) 120×90，深蓝底亮蓝字；对焦卡 (8,130) 120×85，鲜绿底深字。FOCUS 编辑时下方卡变橙色，读数闪烁。两标题均为同一个 LVGL `ui_font_home_title`（Roboto Mono Bold 16 px）；两组距离与 m 单位仍分别共用同一字体。
 - Space Mono Bold 50 px，数字步距 30 px、小数点步距 12.5 px；Roboto Mono Bold 15 px 单位。距离格式、INF、NEAR 和无效状态保留，超宽数值使用较小字体显示。
 - 即时对数尺有限轴 x=14–103，独立无穷远 x=121，指针 8×7。FILM 数字 24 px，相纸 8 格；余量来自 `settings_values_t.film_remaining`，旧记录默认 6，FILM_KEY 恢复成功后设 8，吐片超过 5 s 扣 1 并保存；详见 [延时处理](../film_reload/README.md)。
 
@@ -24,7 +24,7 @@
 | KEY2 短按 | 进入页面、编辑或启动吐片 | 结束编辑 | 切换启动/停止目标，停止命令成功后直接返回 HOME |
 | KEY1 短按 | 下一个功能 | 目标 −50 mm | 无操作 |
 
-FOCUS 编辑图标为橙色，数值约 1.6 Hz 闪烁；首次从当前有限对焦值起步，默认占位目标 2500 mm，范围 50–20000 mm。目标仍为 UI 占位值，尚未下发 FocusUnit。
+FOCUS 编辑时卡片为橙色，数值约 1.6 Hz 闪烁；每次增减 1000 RAW，最低 0、最高 int32 上限，目标变化后发送 MoveRaw。显示 RAW / 100000、保留两位小数（1000 为 `.01`）；m 和绿标尺仅为占位，尚未标定为真实物距。I 为未初始化、零位无效或 MoveRaw 被 BUSY 拒绝，E 为设备故障、堵转或其他协议命令拒绝，C 为通信无效；异常时不显示单位及绿指针。INFO 显示 FocusUnit 状态与当前位置 RAW。
 
 EJECT 页面显示深色停止图标、隐藏上下箭头，保持 EJECT 功能。GPIO1 反向 PWM、GPIO2 恒高，运行目标为 GPIO1 高电平占比 0%（全驱动），启停各目标 1 s 硬件斜坡；停止命令成功后直接返回 HOME 并恢复导航。见 [吐片电机](../../drivers/film_motor/README.md)。
 
@@ -54,7 +54,7 @@ SETUP 浏览时上键回 HOME、下键进入 INFO；中键进入或结束背光�
 
 UI 是 `hc165_take_events()` 唯一消费者；KEY4–6 不分配业务。GPIO42 闪光触发路径保持。任务优先级 3、4096 字节栈，每轮阻塞 50 ms，不补跑延迟周期；EEPROM 保存前释放 LVGL 锁。
 
-`ui.c` 消费快照、按键并保存参数；`ui_view.c` 管理页面，`ui_eject.c` 管理独立吐片页控件；`ui_key_hints.c` 只显示按键提示。只更新当前页，文本、颜色和位置变化时才设置。对焦暂取同次 SDM50 快照，using_actual 标记保留在接口内；显示状态映射见 [对焦物距](../focus_distance/README.md)。电池估算及 IPROPI 换算见 [电源读数](../power_monitor/README.md)。
+`ui.c` 消费快照、按键并保存参数；`ui_view.c` 管理页面，`ui_eject.c` 管理独立吐片页控件；`ui_key_hints.c` 只显示按键提示。只更新当前页，文本、颜色和位置变化时才设置。对焦目标与实际位置来自 FocusUnit UART，显示状态映射见 [对焦物距](../focus_distance/README.md)。电池估算及 IPROPI 换算见 [电源读数](../power_monitor/README.md)。
 
 `ui_home_assets.c/h` 由 `UI设计/PortraitUI/export_lvgl_assets.cjs` 生成并在 CMake 注册。静态内容导出为 RGB565 窄条，侧栏由 LVGL 绘制，指针和亮暗相纸单独保存；不保存整屏背景。导出器按 `data-ui-live` 标记移除两标题、示例读数、FOCUS 底卡、电池和侧栏等动态内容；ACTUAL 底卡保留静态。距离字体只导出数字及标点，小数点的位图偏移与步距单独调整。Space Mono 和 Roboto Mono 的官方 TTF、OFL 1.1 许可与来源摘要均保留，发布时见 [字体许可](../../../THIRD_PARTY_NOTICES.md)。
 

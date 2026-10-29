@@ -8,6 +8,9 @@
 #include "power_monitor.h"
 #include "charge_status.h"
 #include "film_motor.h"
+#include "focus_unit.h"
+#include <stdint.h>
+#include <limits.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
@@ -15,9 +18,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define FOCUS_STEP_MM 50
-#define FOCUS_MIN_MM 50
-#define FOCUS_MAX_MM 20000
+#define FOCUS_STEP_RAW 1000
 #define FOCUS_BLINK_HALF_US 312500LL
 #define FILM_CONSUME_AFTER_US 5000000LL
 
@@ -35,8 +36,6 @@ static struct {
     int64_t motor_started_us;
     int64_t eject_started_us;
     int64_t motor_ramp_started_us;
-    bool focus_target_active;
-    int32_t focus_target_mm;
     const char *save_message;
 } ui;
 
@@ -72,20 +71,6 @@ static void handle_keys(hc165_key_events_t keys)
                     ui.editing = false;
                     break;
                 case UI_HOME_FUNC_FOCUS:
-                    /* Seed the first edit from the current reading, not the
-                     * startup WAITING placeholder. Later edits retain the target. */
-                    if (!ui.focus_target_active) {
-                        sdm50_sample_t sample;
-                        if (sdm50_get_sample(&sample) == ESP_OK) {
-                            const focus_distance_t focus = focus_distance_get(&sample);
-                            if (focus.state == FOCUS_DISTANCE_FINITE) {
-                                ui.focus_target_mm = (int32_t)focus.distance_mm;
-                                if (ui.focus_target_mm < FOCUS_MIN_MM) ui.focus_target_mm = FOCUS_MIN_MM;
-                                if (ui.focus_target_mm > FOCUS_MAX_MM) ui.focus_target_mm = FOCUS_MAX_MM;
-                            }
-                        }
-                    }
-                    ui.focus_target_active = true;
                     ui.focus_editing = true;
                     break;
                 case UI_HOME_FUNC_INFO:
@@ -130,15 +115,12 @@ static void handle_keys(hc165_key_events_t keys)
 
     if (ui.page == UI_HOME) {
         if (ui.focus_editing) {
-            if (next) {
-                ui.focus_target_mm = ui.focus_target_mm + FOCUS_STEP_MM >= FOCUS_MAX_MM
-                                         ? FOCUS_MAX_MM
-                                         : ui.focus_target_mm + FOCUS_STEP_MM;
-            } else {
-                ui.focus_target_mm = ui.focus_target_mm - FOCUS_STEP_MM <= FOCUS_MIN_MM
-                                         ? FOCUS_MIN_MM
-                                         : ui.focus_target_mm - FOCUS_STEP_MM;
-            }
+            const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+            const int32_t current = focus_unit_snapshot(now_ms).desired_raw;
+            int64_t target = (int64_t)current + (next ? FOCUS_STEP_RAW : -FOCUS_STEP_RAW);
+            if (target < 0) target = 0;
+            if (target > INT32_MAX) target = INT32_MAX;
+            focus_unit_set_target((int32_t)target);
         } else {
             /* K3 moves up to the previous function, K1 down to the next. */
             ui.home_func = next ? (ui.home_func + UI_HOME_FUNC_COUNT - 1) %
@@ -177,14 +159,10 @@ static void ui_task(void *argument)
         if (sdm50_get_sample(&sample) != ESP_OK) {
             sample.status = SDM50_RX_ERROR;
         }
-        focus_distance_t focus = focus_distance_get(&sample);
-        if (ui.focus_target_active) {
-            /* Local setpoint placeholder until the FocusUnit position command
-             * and calibration are connected. */
-            focus.state = FOCUS_DISTANCE_FINITE;
-            focus.distance_mm = (uint32_t)ui.focus_target_mm;
-            focus.using_actual = false;
-        }
+        const uint32_t focus_now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+        focus_unit_process(focus_now_ms);
+        const focus_unit_snapshot_t focus_snapshot = focus_unit_snapshot(focus_now_ms);
+        const focus_distance_t focus = focus_distance_get(&focus_snapshot);
 
         power_sample_t power;
         power_monitor_get(&power);
@@ -210,6 +188,7 @@ static void ui_task(void *argument)
         if (settings_available) ui_view_film((unsigned)values.film_remaining);
         ui_view_uptime((uint64_t)(now / 1000000));
         ui_view_info(&values, &status, settings_available);
+        ui_view_focus_info(&focus, &focus_snapshot);
         const char *message = ui.save_message;
         if (!message) {
             message = !settings_available || !status.writable ? "STORAGE ERROR" :
@@ -242,7 +221,6 @@ static void ui_task(void *argument)
 void ui_start(lv_display_t *display)
 {
     ui.home_func = UI_HOME_FUNC_FOCUS;
-    ui.focus_target_mm = 2500;
 
     settings_values_t values = {0};
     const bool settings_available = settings_get(&values) == ESP_OK;
@@ -251,7 +229,8 @@ void ui_start(lv_display_t *display)
     ESP_ERROR_CHECK(lvgl_port_lock(0) ? ESP_OK : ESP_ERR_TIMEOUT);
     ui_view_create(display);
     sdm50_sample_t sample = {.status = SDM50_WAITING};
-    const focus_distance_t focus = focus_distance_get(&sample);
+    const focus_unit_snapshot_t focus_snapshot = focus_unit_snapshot((uint32_t)(esp_timer_get_time() / 1000));
+    const focus_distance_t focus = focus_distance_get(&focus_snapshot);
     ui_view_range(&focus, &sample);
     ui_view_key_hints(UI_HOME, ui.home_func, false, false);
     ui_view_film((unsigned)values.film_remaining);

@@ -62,6 +62,7 @@ extern const lv_image_dsc_t ui_film_lit_6;
 extern const lv_image_dsc_t * const ui_film_lit[8];
 LV_FONT_DECLARE(ui_font_body);
 LV_FONT_DECLARE(ui_font_body_bold);
+LV_FONT_DECLARE(ui_font_home_title);
 LV_FONT_DECLARE(ui_font_info_label);
 LV_FONT_DECLARE(ui_font_small);
 LV_FONT_DECLARE(ui_font_info_compact);

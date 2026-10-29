@@ -10,7 +10,7 @@ const source = fs.readFileSync(path.join(__dirname, '../../home.svg'), 'utf8');
         const page = await browser.newPage({viewport: {width: 172, height: 320}, deviceScaleFactor: 4});
         await page.setContent(`<style>html,body{margin:0}svg{display:block}</style>${source}`);
         await page.evaluate(async () => {
-            await document.fonts.load('700 14px "Roboto Mono"');
+            await document.fonts.load('700 16px "Roboto Mono"');
             await document.fonts.load('700 50px "Space Mono"');
             await document.fonts.ready;
         });

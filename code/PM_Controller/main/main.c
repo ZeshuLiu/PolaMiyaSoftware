@@ -5,6 +5,7 @@
 #include "film_motor.h"
 #include "film_reload.h"
 #include "usb_power.h"
+#include "focus_unit.h"
 #include "ui.h"
 #include "lcd_st7789.h"
 #include "settings.h"
@@ -151,6 +152,8 @@ void app_main(void)
     boot_screen_complete(adc_result);
     boot_screen_finish();
 
+    const esp_err_t focus_result = focus_unit_init();
+    if (focus_result != ESP_OK) ESP_LOGW(TAG, "FocusUnit UART init failed: %s", esp_err_to_name(focus_result));
     ESP_LOGI(TAG, "ui_start begin");
     ui_start(display);
     ESP_LOGI(TAG, "ui_start done");

@@ -41,7 +41,7 @@
 ```text
 flash_trigger_prepare_output（GPIO38 低电平）→ film_motor_init（GPIO1/2 制动）→ lcd_st7789_init → display_init → boot_screen_start
 → flash_trigger_init / shutter_init → hc165_init → sdm50_init / sdm50_start → settings_init
-→ adc_measure_init → boot_screen_finish → ui_start
+→ adc_measure_init → boot_screen_finish → focus_unit_init → ui_start
 ```
 
 闪光、按键和显示初始化失败停止启动。参数存储失败记录错误并继续显示启动；参数锁成功分配后，器件错误时仍可使用 RAM 默认值，持久化提交被禁止。
@@ -54,7 +54,8 @@ flash_trigger_prepare_output（GPIO38 低电平）→ film_motor_init（GPIO1/2 
 | LVGL 接入 | [app/display](main/app/display/)；`display_init()` | 官方移植层管理任务、时钟、双缓冲、刷新、字节交换及旋转；CASE 7、完整 RAM 清屏及 gap=(34,0) 在此配置；不要另外注册 DMA 完成回调 |
 | 开机画面 | [app/boot_screen](main/app/boot_screen/README.md)；`boot_screen_start/begin/complete/finish()` | 启动任务调用，六行初始化状态、白底黑狗及出厂 MAC；外设初始化不持有显示锁；完成后由 `ui_start()` 接管 |
 | 竖屏 UI | [app/ui](main/app/ui/README.md)；`ui_start()` | 默认启动三页界面；只使用 KEY1–3，KEY4–6 暂未接线；UI 为 HC165 事件唯一消费者，EEPROM 保存不得持有 LVGL 锁 |
-| 对焦物距 | [app/focus_distance](main/app/focus_distance/README.md)；`focus_distance_get()` | 当前借用实测距离，内部以 using_actual 标记占位来源，屏幕不显示状态行；后续接 FocusUnit 通信和位置标定，编码器计数不能直接当毫米；INF 独立状态 |
+| FocusUnit UART | [drivers/focus_unit](main/drivers/focus_unit/README.md)；`focus_unit_init/process` | UART2 GPIO18/17，单请求、状态查询和 MoveRaw；UI 任务独占，初始化失败不阻止启动 |
+| 对焦物距 | [app/focus_distance](main/app/focus_distance/README.md)；`focus_distance_get()` | FocusUnit RAW 命令目标及 I/E/C 状态；显示比例 RAW / 100000 与标尺仅为占位，物距标定待接入 |
 | ADC 采样 | [drivers/adc_measure](main/drivers/adc_measure/README.md)；`adc_measure_init/get()` | ADC1 GPIO3/CH2、GPIO8/CH7；最低连续 DMA 总采样率 611 Hz，每路约 305.5 Hz、31 样本/窗口；校准和 IIR；禁止同时占用 ADC1 oneshot |
 | 电源显示 | [app/power_monitor](main/app/power_monitor/README.md)；`power_monitor_get()` | 用户确认单节 4.2 V 锂电池；电压乘 2、通用节点估算电量；IPROPI 按 R2=1 kΩ、1575 µA/A 换算；未实现低压/过流/堵转保护 |
 | 屏幕测试 | [app/lcd_test](main/app/lcd_test/)；`lcd_test_start()` | CASE 7 帧率与圆角排查源码保留，默认不启动；不得与 UI 同时运行 |
@@ -105,7 +106,7 @@ flash_trigger_prepare_output（GPIO38 低电平）→ film_motor_init（GPIO1/2 
 
 ## 任务与 ISR
 
-- SDM50 独占 UART1（GPIO4/5）与 UHCI，460800、8N1，使用官方 UHCI DMA 收发。DMA ISR 直接解析并更新快照，同核任务只负责 EOF 后重新挂载；不要同时安装普通 UART 接收驱动。公开接口仅任务上下文；启停等待应答，UI/对焦只消费 VALID 快照。详见 `main/drivers/sdm50/README.md`；用户于 2026-10-15 确认编译通过；未运行测试、未上板验证。
+- SDM50 独占 UART1（GPIO4/5）与 UHCI，460800、8N1，使用官方 UHCI DMA 收发。DMA ISR 直接解析并更新快照，同核任务只负责 EOF 后重新挂载；不要同时安装普通 UART 接收驱动。公开接口仅任务上下文；启停等待应答，UI 的 ACTUAL 只消费 VALID 快照。详见 `main/drivers/sdm50/README.md`；用户于 2026-10-15 确认编译通过；未运行测试、未上板验证。
 
 - 参数、EEPROM、按键事件读取用于任务上下文；闪光触发及忙状态查询支持任务和普通 GPIO ISR，初始化仅在任务中执行。
 - 快门 ISR 直接调用 flash_trigger_fire() 以减少启动延迟；不要在 ISR 中调用 EEPROM、参数提交、LVGL、打印日志或等待任务。
