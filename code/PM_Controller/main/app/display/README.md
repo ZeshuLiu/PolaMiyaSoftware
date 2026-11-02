@@ -1,5 +1,9 @@
 # LVGL 显示接入
 
+2026-11-02：用户确认 100 ms 慢帧只在切页时偶发；同日另提供静止时发生的 StoreProhibited / CORRUPTED 回溯，二者尚无已证实的因果关系。新增 ELF 归档和运行定位日志见 [异常定位](../diagnostics/README.md)。未改变慢帧阈值、SPI / DMA 回调或看门狗设置；panic 根因尚未确认。
+
+2026-11-02：LVGL 9 的内建 TLSF 内存池通过 `LV_MEM_POOL_ALLOC` 钩子从 PSRAM 分配，替代原片内 64 KiB 静态池；原池大小仍由 `CONFIG_LV_MEM_SIZE_KILOBYTES` 控制。失败时显式终止启动，不回退到片内内存；串口输出池大小及片内空闲 / 最大块。应用初始化位于 `display.c`，LVGL 组件的钩子由 `main/CMakeLists.txt` 注入，不修改第三方源码或 sdkconfig。屏幕内部 DMA 双缓冲仍为 172×64，LVGL 与 UI 任务栈不迁移。未编译、测试或烧录；BLE 配网、Flash/NVS 操作期间的显示和性能、池内存完整性待实机验证。
+
 `display_init()` 配置官方 esp_lvgl_port、RGB565、172×64 行内部 DMA 双缓冲，设置 CASE 7 及 gap=(34,0)，背光关闭时清理整个控制器 RAM。官方移植层保留 LVGL 任务、时钟、SPI 刷新和 DMA 完成回调。
 
 2026-10-19：显示初始化前移到大部分外设之前。GPIO38 先预置低电平，随后完成 ST7789/LVGL，并由 [boot_screen](../boot_screen/README.md) 显示狗图、逐行启动状态和出厂 MAC。各模块初始化释放显示锁，最后由原 UI 接管；方向、gap、缓冲与 DMA 回调未改变。本轮未编译、未上板验证。

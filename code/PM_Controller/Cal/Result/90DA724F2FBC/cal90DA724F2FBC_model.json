@@ -1,0 +1,70 @@
+{
+  "source": {
+    "filename": "cal90DA724F2FBC.csv",
+    "sha256": "de93f331391ae1e0921602352afb7bdb5b3508d5dd5835b5b0aa989309d5c735",
+    "distance_unit": "m",
+    "raw_unit": "encoder count",
+    "rows": 13
+  },
+  "model": {
+    "kind": "offset_reciprocal",
+    "raw_infinity": 1016.0,
+    "a_raw_m": 14898.942251706136,
+    "b_m": 0.2501418916102886,
+    "infinity_anchored": true,
+    "forward": "RAW = raw_infinity + a_raw_m / (distance_m - b_m)",
+    "inverse": "distance_m = b_m + a_raw_m / (RAW - raw_infinity)",
+    "infinity_raw_count": 1,
+    "b_is_measured_focal_length": false
+  },
+  "domain": {
+    "minimum_distance_m": 1.0,
+    "maximum_measured_finite_distance_m": 9.0,
+    "maximum_distance_m": null,
+    "infinity_is_measured": true
+  },
+  "finite_fit_metrics": {
+    "count": 12,
+    "rmse_raw": 334.22716050668976,
+    "mae_raw": 274.56680354282145,
+    "max_absolute_error_raw": 614.9846689515907,
+    "r_squared": 0.9967325350023518
+  },
+  "all_rows_fit_metrics": {
+    "count": 13,
+    "rmse_raw": 321.11506898071656,
+    "mae_raw": 253.44628019337364,
+    "max_absolute_error_raw": 614.9846689515907,
+    "r_squared": 0.9972227520419906
+  },
+  "finite_loo_metrics": {
+    "count": 12,
+    "rmse_raw": 558.8277006301103,
+    "mae_raw": 393.38805966102245,
+    "max_absolute_error_raw": 1516.2029812087603,
+    "r_squared": 0.990865530784872
+  },
+  "finite_loo_unavailable_count": 0,
+  "loo_method": "Hold out finite rows only; retain measured infinity anchor in training.",
+  "reference_model": null,
+  "fit_method": {
+    "mode": "full",
+    "objective": "unweighted squared RAW error",
+    "b_bounds_m": [
+      0.0,
+      0.95
+    ]
+  },
+  "curve_sampling": {
+    "coordinate": "inverse distance 1/d",
+    "points": 1001,
+    "integer_rounding": "numpy.rint, ties to even"
+  },
+  "versions": {
+    "python": "3.12.7",
+    "numpy": "1.26.4",
+    "scipy": "1.17.1",
+    "matplotlib": "3.9.2"
+  },
+  "reference": "https://www.edmundoptics.com/knowledge-center/application-notes/imaging/basic-lens-selection/"
+}

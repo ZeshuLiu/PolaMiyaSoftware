@@ -65,7 +65,7 @@ static uint8_t execute(uint8_t cmd, const uint8_t *p, uint8_t len, uint8_t *out)
     case 0x01: case 0x02: case 0x10: expected = 0U; break;
     case 0x11: expected = 2U; break;
     case 0x12: expected = 3U; break;
-    case 0x13: expected = 4U; break;
+    case 0x13: case 0x14: expected = 4U; break;
     default: out[0] = RESULT_UNKNOWN; return 1U;
     }
     if (len != expected) { out[0] = RESULT_LENGTH; return 1U; }
@@ -93,7 +93,10 @@ static uint8_t execute(uint8_t cmd, const uint8_t *p, uint8_t len, uint8_t *out)
         put16(out + 22, adc.raw_vrefint); return 24U;
     }
     if (motor.work_state == FOCUS_MOTOR_WORK_ERROR) { out[0] = RESULT_ERROR; return 1U; }
-    if ((motor.initialized == 0U) || (motor.work_state != FOCUS_MOTOR_WORK_NORMAL)) {
+    /* 未初始化时放行两种初始化入口，寻零执行中仍拒绝控制覆盖。 */
+    uint8_t init_request = (cmd == 0x14) || (cmd == 0x11 && p[1] != 0U);
+    if ((motor.initialized == 0U) || (motor.seek_zero != 0U) ||
+        ((motor.work_state != FOCUS_MOTOR_WORK_NORMAL) && (init_request == 0U))) {
         out[0] = RESULT_BUSY; return 1U;
     }
     switch (cmd) {
@@ -103,6 +106,9 @@ static uint8_t execute(uint8_t cmd, const uint8_t *p, uint8_t len, uint8_t *out)
                                     (uint16_t)p[1] | ((uint16_t)p[2] << 8)); break;
     case 0x13:
         if (FocusMotor_MoveRaw((int32_t)get32(p)) != HAL_OK) out[0] = RESULT_BUSY;
+        break;
+    case 0x14:
+        if (FocusMotor_SetCurrentRaw((int32_t)get32(p)) != HAL_OK) out[0] = RESULT_BUSY;
         break;
     default: break;
     }
@@ -124,16 +130,6 @@ static void handle_frame(void)
     crc = crc16(s_frame + 2, (uint8_t)(5U + s_frame[6]));
     if (s_frame[7U + s_frame[6]] != (uint8_t)crc ||
         s_frame[8U + s_frame[6]] != (uint8_t)(crc >> 8)) return;
-    /* 零位未确认时连序号冲突也返回 BUSY，不覆盖已执行命令的去重缓存。 */
-    FocusMotor_Snapshot motor;
-    FocusMotor_GetSnapshot(&motor);
-    if (motor.zero_valid == 0U) {
-        uint8_t busy[10] = {0xA5U, 0x5AU, 1U, 1U, 0U, 0U, 1U, RESULT_BUSY, 0U, 0U};
-        busy[4] = s_frame[4]; busy[5] = s_frame[5];
-        crc = crc16(busy + 2, 6U); put16(busy + 8, crc);
-        send_response(busy, sizeof(busy));
-        return;
-    }
     if (s_cached != 0U && s_frame[4] == s_request[4]) {
         if (s_frame_len == s_request_len && memcmp(s_frame, s_request, s_frame_len) == 0) {
             send_response(s_response, s_response_len);
@@ -146,6 +142,14 @@ static void handle_frame(void)
         return;
     }
     length = execute(s_frame[5], s_frame + 7, s_frame[6], payload);
+    /* BUSY 不进入缓存，状态允许后可重发；已受理的初始化仍按原规则去重。 */
+    if (payload[0] == RESULT_BUSY) {
+        uint8_t busy[10] = {0xA5U, 0x5AU, 1U, 1U, 0U, 0U, 1U, RESULT_BUSY, 0U, 0U};
+        busy[4] = s_frame[4]; busy[5] = s_frame[5];
+        crc = crc16(busy + 2, 6U); put16(busy + 8, crc);
+        send_response(busy, sizeof(busy));
+        return;
+    }
     memcpy(s_request, s_frame, s_frame_len); s_request_len = s_frame_len; s_cached = 1U;
     s_response[0] = 0xA5U; s_response[1] = 0x5AU; s_response[2] = 1U; s_response[3] = 1U;
     s_response[4] = s_frame[4]; s_response[5] = s_frame[5]; s_response[6] = length;

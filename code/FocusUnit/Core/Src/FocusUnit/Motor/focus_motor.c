@@ -6,13 +6,6 @@
 
 #define MOTOR_PERIOD_COUNTS 2400U
 #define MOTOR_PERMILLE 1000U
-#define MOTOR_BOOT_HOME_DELAY_MS 700U
-
-typedef enum {
-    BOOT_WAIT = 0,
-    BOOT_HOME,
-    BOOT_DONE
-} MotorBootPhase;
 
 FocusMotor_Config FocusMotor_ConfigData = { MOTOR_PERMILLE, FOCUS_MOTOR_DIR_A };
 volatile FocusMotor_Snapshot FocusMotor_State;
@@ -35,7 +28,6 @@ static uint32_t s_move_drive_start_ms;
 static uint32_t s_move_adc_sequence;
 static uint8_t s_move_adc_seen;
 static uint8_t s_move_stall_frames;
-static MotorBootPhase s_boot_phase;
 
 /* 成对写入比较预装载，在同一次 PWM 更新事件生效。 */
 static void set_ccr(uint32_t a, uint32_t b)
@@ -182,7 +174,6 @@ HAL_StatusTypeDef FocusMotor_Init(TIM_HandleTypeDef *htim)
         return HAL_OK;
     }
     write_brake();
-    s_boot_phase = BOOT_WAIT;
     publish_snapshot(0U);
     return HAL_OK;
 }
@@ -317,17 +308,11 @@ void FocusMotor_Step(uint32_t now_ms)
 {
     const FocusMotor_HomeStatus *home = FocusMotor_HomeGetStatus();
     if ((s_initialized == 0U) || (home->work_state == FOCUS_MOTOR_WORK_ERROR)) return;
-    if (s_boot_phase == BOOT_WAIT) {
-        if (now_ms < MOTOR_BOOT_HOME_DELAY_MS) return;
-        s_boot_phase = BOOT_HOME;
-        FocusMotor_HomeStart(FOCUS_MOTOR_HOME_DIRECTION);
-        s_seek_zero = 1U;
-        select_glide(FOCUS_MOTOR_HOME_DIRECTION);
-    }
     if (home->work_state == FOCUS_MOTOR_WORK_INITIALIZING) {
+        /* 上电等待外部初始化；只有显式寻零才推进触底流程。 */
+        if (s_seek_zero == 0U) return;
         step_home(now_ms);
         if ((home->work_state == FOCUS_MOTOR_WORK_NORMAL) && (home->zero_valid != 0U)) {
-            s_boot_phase = BOOT_DONE;
             (void)FocusMotor_MoveRaw(0);
         }
         return;
@@ -348,11 +333,12 @@ void FocusMotor_Step(uint32_t now_ms)
     }
 }
 
-/* 显式命令只在正常状态生效；寻零参数决定是否启动完整校验/重试流程。 */
+/* 待初始化时仅受理寻零 Glide；运行中的寻零不能被覆盖。 */
 void FocusMotor_Glide(FocusMotor_Direction direction, uint8_t seek_zero)
 {
-    if (can_control() == 0U) return;
-    s_boot_phase = BOOT_DONE;
+    if ((s_initialized == 0U) || (s_seek_zero != 0U) ||
+        (FocusMotor_HomeGetStatus()->work_state == FOCUS_MOTOR_WORK_ERROR)) return;
+    if ((can_control() == 0U) && (seek_zero == 0U)) return;
     FocusMotor_TestStop();
     cancel_move();
     stop_output();
@@ -365,7 +351,6 @@ void FocusMotor_Glide(FocusMotor_Direction direction, uint8_t seek_zero)
 void FocusMotor_OpenLoop(FocusMotor_Direction direction, uint16_t duty_permille)
 {
     if (can_control() == 0U) return;
-    s_boot_phase = BOOT_DONE;
     uint8_t was_move = (s_mode == FOCUS_MOTOR_MODE_MOVE_RAW);
     FocusMotor_TestStop();
     cancel_move();
@@ -377,7 +362,6 @@ void FocusMotor_OpenLoop(FocusMotor_Direction direction, uint16_t duty_permille)
 void FocusMotor_Stop(void)
 {
     if (can_control() == 0U) return;
-    s_boot_phase = BOOT_DONE;
     FocusMotor_TestStop();
     cancel_move();
     stop_output();
@@ -387,7 +371,6 @@ HAL_StatusTypeDef FocusMotor_MoveRaw(int32_t target_raw)
 {
     if (FocusMotor_HomeGetStatus()->work_state == FOCUS_MOTOR_WORK_ERROR) return HAL_ERROR;
     if ((can_control() == 0U) || (FocusMotor_HomeGetStatus()->zero_valid == 0U)) return HAL_BUSY;
-    s_boot_phase = BOOT_DONE;
     FocusMotor_TestStop();
     stop_output();
     s_target_raw = target_raw;
@@ -396,6 +379,20 @@ HAL_StatusTypeDef FocusMotor_MoveRaw(int32_t target_raw)
     s_move_settling = 0U;
     s_mode = FOCUS_MOTOR_MODE_MOVE_RAW;
     /* 下一次电机任务检查位置、制动稳定或开始驱动。 */
+    publish_snapshot(0U);
+    return HAL_OK;
+}
+
+/* 外部确认当前位置，只重建编码器基准，不启动定位或输出驱动。 */
+HAL_StatusTypeDef FocusMotor_SetCurrentRaw(int32_t current_raw)
+{
+    if (FocusMotor_HomeGetStatus()->work_state == FOCUS_MOTOR_WORK_ERROR) return HAL_ERROR;
+    if ((s_initialized == 0U) || (s_seek_zero != 0U) ||
+        (s_mode != FOCUS_MOTOR_MODE_STOP)) return HAL_BUSY;
+    FocusMotor_TestStop();
+    cancel_move();
+    stop_output();
+    FocusMotor_HomeSetCurrentRaw(current_raw);
     publish_snapshot(0U);
     return HAL_OK;
 }

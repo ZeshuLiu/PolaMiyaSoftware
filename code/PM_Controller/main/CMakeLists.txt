@@ -17,16 +17,25 @@ idf_component_register(
         "app/film_reload/film_reload.c"
         "app/settings/settings_record.c"
         "app/display/display.c"
+        "app/diagnostics/runtime_diagnostics.c"
         "app/boot_screen/boot_screen.c"
         "app/lcd_test/lcd_test.c"
         "app/ui/ui.c"
+        "app/ui/ui_menu.c"
+        "app/ui/ui_menu_view.c"
+        "app/ui/ui_settings.c"
         "app/ui/ui_view.c"
         "app/ui/ui_eject.c"
         "app/ui/ui_battery.c"
         "app/charge_status/charge_status.c"
         "app/ui/ui_key_hints.c"
         "app/ui/ui_home_assets.c"
+        "app/wifi_control/wifi_control.c"
+        "app/wifi_control/wifi_networks.c"
+        "app/wifi_control/wifi_pair.c"
+        "app/wifi_control/wifi_web.c"
         "app/focus_distance/focus_distance.c"
+        "app/focus_position/focus_position.c"
         "app/power_monitor/power_monitor.c"
     INCLUDE_DIRS
         "."
@@ -44,11 +53,23 @@ idf_component_register(
         "app/shutter"
         "app/film_reload"
         "app/display"
+        "app/diagnostics"
         "app/boot_screen"
         "app/lcd_test"
         "app/ui"
         "app/charge_status"
+        "app/wifi_control"
         "app/focus_distance"
+        "app/focus_position"
         "app/power_monitor"
-    PRIV_REQUIRES esp_lcd esp_driver_spi esp_driver_gpio esp_driver_ledc esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_adc esp_timer freertos esp_rom esp_hw_support
+    PRIV_REQUIRES esp_system soc bt protocomm esp_http_server esp_wifi esp_event esp_netif nvs_flash esp_lcd esp_driver_spi esp_driver_gpio esp_driver_ledc esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_adc esp_timer freertos esp_rom esp_hw_support esp_app_format heap
+)
+
+# LVGL 9 builtin allocator supports a pool hook. Configure only the LVGL
+# component so its 64 KiB static internal pool is replaced by a PSRAM pool;
+# screen DMA buffers continue to be allocated separately by esp_lvgl_port.
+idf_component_get_property(lvgl_component_lib lvgl__lvgl COMPONENT_LIB)
+target_compile_definitions(${lvgl_component_lib} PRIVATE
+    LV_MEM_POOL_INCLUDE=\"${CMAKE_CURRENT_LIST_DIR}/app/display/lvgl_psram_pool.h\"
+    LV_MEM_POOL_ALLOC=pm_lvgl_psram_pool_alloc
 )

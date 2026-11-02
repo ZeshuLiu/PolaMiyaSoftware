@@ -1,0 +1,1064 @@
+[
+  {
+    "state": "numeric-browse",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 125,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "START",
+        "size": 14,
+        "x": 16,
+        "y": 154,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 206,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "SAVED",
+        "size": 14,
+        "x": 16,
+        "y": 255,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "HOLD TO SAVE",
+        "size": 14,
+        "x": 16,
+        "y": 281,
+        "width": 100.828125,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "numeric-edit",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 125,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "START",
+        "size": 14,
+        "x": 16,
+        "y": 154,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 206,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "UNSAVED",
+        "size": 14,
+        "x": 16,
+        "y": 255,
+        "width": 59.408203125,
+        "height": 19
+      },
+      {
+        "text": "HOLD TO SAVE",
+        "size": 14,
+        "x": 16,
+        "y": 281,
+        "width": 100.828125,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "action-ready",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 125,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "START",
+        "size": 14,
+        "x": 16,
+        "y": 154,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 206,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "FOCUS READY",
+        "size": 14,
+        "x": 16,
+        "y": 255,
+        "width": 93.013671875,
+        "height": 19
+      },
+      {
+        "text": "PRESS TO RUN",
+        "size": 14,
+        "x": 16,
+        "y": 281,
+        "width": 100.828125,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "action-running",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 125,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "RUNNING",
+        "size": 14,
+        "x": 16,
+        "y": 154,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 206,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "HOMING...",
+        "size": 14,
+        "x": 16,
+        "y": 255,
+        "width": 75.625,
+        "height": 19
+      },
+      {
+        "text": "PLEASE WAIT",
+        "size": 14,
+        "x": 16,
+        "y": 281,
+        "width": 93.013671875,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "choice-on",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 115,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "START",
+        "size": 14,
+        "x": 16,
+        "y": 136,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "KEY TONE",
+        "size": 14,
+        "x": 16,
+        "y": 179,
+        "width": 67.21875,
+        "height": 19
+      },
+      {
+        "text": "OFF",
+        "size": 14,
+        "x": 29.390625,
+        "y": 206,
+        "width": 25.802734375,
+        "height": 19
+      },
+      {
+        "text": "ON",
+        "size": 14,
+        "x": 85.59375,
+        "y": 206,
+        "width": 16.8125,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 254,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "PRESS TO SET",
+        "size": 14,
+        "x": 12,
+        "y": 290,
+        "width": 101.4150390625,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "choice-off",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 115,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "START",
+        "size": 14,
+        "x": 16,
+        "y": 136,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "KEY TONE",
+        "size": 14,
+        "x": 16,
+        "y": 179,
+        "width": 67.21875,
+        "height": 19
+      },
+      {
+        "text": "OFF",
+        "size": 14,
+        "x": 29.390625,
+        "y": 206,
+        "width": 25.802734375,
+        "height": 19
+      },
+      {
+        "text": "ON",
+        "size": 14,
+        "x": 85.59375,
+        "y": 206,
+        "width": 16.8125,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 254,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "PRESS TO SET",
+        "size": 14,
+        "x": 12,
+        "y": 290,
+        "width": 101.4150390625,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "back",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 125,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "START",
+        "size": 14,
+        "x": 16,
+        "y": 154,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 206,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "RETURN HOME",
+        "size": 14,
+        "x": 16,
+        "y": 255,
+        "width": 92.421875,
+        "height": 19
+      },
+      {
+        "text": "PRESS OK",
+        "size": 14,
+        "x": 16,
+        "y": 281,
+        "width": 67.8095703125,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "submenu-entry",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 115,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "START",
+        "size": 14,
+        "x": 16,
+        "y": 136,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "LANGUAGE",
+        "size": 14,
+        "x": 16,
+        "y": 179,
+        "width": 67.21875,
+        "height": 19
+      },
+      {
+        "text": "ENGLISH",
+        "size": 14,
+        "x": 16,
+        "y": 208,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 254,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "PRESS TO OPEN",
+        "size": 14,
+        "x": 12,
+        "y": 290,
+        "width": 109.21875,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "submenu-current",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "LANGUAGE",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "1/8",
+        "size": 14,
+        "x": 102.78125,
+        "y": 7,
+        "width": 25.21875,
+        "height": 19
+      },
+      {
+        "text": "ENGLISH",
+        "size": 14,
+        "x": 12,
+        "y": 40,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "ENGLISH",
+        "size": 14,
+        "x": 16,
+        "y": 78,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "GERMAN",
+        "size": 14,
+        "x": 16,
+        "y": 118,
+        "width": 50.421875,
+        "height": 19
+      },
+      {
+        "text": "FRENCH",
+        "size": 14,
+        "x": 16,
+        "y": 158,
+        "width": 50.421875,
+        "height": 19
+      },
+      {
+        "text": "ITALIAN",
+        "size": 14,
+        "x": 16,
+        "y": 198,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "SPANISH",
+        "size": 14,
+        "x": 16,
+        "y": 238,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 280,
+        "width": 34.2041015625,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "submenu-select",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "LANGUAGE",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "5/8",
+        "size": 14,
+        "x": 102.78125,
+        "y": 7,
+        "width": 25.21875,
+        "height": 19
+      },
+      {
+        "text": "ENGLISH",
+        "size": 14,
+        "x": 12,
+        "y": 40,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "FRENCH",
+        "size": 14,
+        "x": 16,
+        "y": 78,
+        "width": 50.421875,
+        "height": 19
+      },
+      {
+        "text": "ITALIAN",
+        "size": 14,
+        "x": 16,
+        "y": 118,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "SPANISH",
+        "size": 14,
+        "x": 16,
+        "y": 158,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "JAPANESE",
+        "size": 14,
+        "x": 16,
+        "y": 198,
+        "width": 67.21875,
+        "height": 19
+      },
+      {
+        "text": "KOREAN",
+        "size": 14,
+        "x": 16,
+        "y": 238,
+        "width": 50.421875,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 280,
+        "width": 34.2041015625,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "submenu-scroll",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "LANGUAGE",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "8/8",
+        "size": 14,
+        "x": 102.78125,
+        "y": 7,
+        "width": 25.21875,
+        "height": 19
+      },
+      {
+        "text": "ENGLISH",
+        "size": 14,
+        "x": 12,
+        "y": 40,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "ITALIAN",
+        "size": 14,
+        "x": 16,
+        "y": 78,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "SPANISH",
+        "size": 14,
+        "x": 16,
+        "y": 118,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "JAPANESE",
+        "size": 14,
+        "x": 16,
+        "y": 158,
+        "width": 67.21875,
+        "height": 19
+      },
+      {
+        "text": "KOREAN",
+        "size": 14,
+        "x": 16,
+        "y": 198,
+        "width": 50.421875,
+        "height": 19
+      },
+      {
+        "text": "PORTUGUESE",
+        "size": 14,
+        "x": 16,
+        "y": 238,
+        "width": 84.015625,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 280,
+        "width": 34.2041015625,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "submenu-cancel",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "LANGUAGE",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "8/8",
+        "size": 14,
+        "x": 102.78125,
+        "y": 7,
+        "width": 25.21875,
+        "height": 19
+      },
+      {
+        "text": "ENGLISH",
+        "size": 14,
+        "x": 12,
+        "y": 40,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "ITALIAN",
+        "size": 14,
+        "x": 16,
+        "y": 78,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "SPANISH",
+        "size": 14,
+        "x": 16,
+        "y": 118,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "JAPANESE",
+        "size": 14,
+        "x": 16,
+        "y": 158,
+        "width": 67.21875,
+        "height": 19
+      },
+      {
+        "text": "KOREAN",
+        "size": 14,
+        "x": 16,
+        "y": 198,
+        "width": 50.421875,
+        "height": 19
+      },
+      {
+        "text": "PORTUGUESE",
+        "size": 14,
+        "x": 16,
+        "y": 238,
+        "width": 84.015625,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 280,
+        "width": 34.2041015625,
+        "height": 19
+      }
+    ]
+  },
+  {
+    "state": "submenu-returned",
+    "minimumFontPx": 14,
+    "text": [
+      {
+        "text": "SETTINGS",
+        "size": 16,
+        "x": 12,
+        "y": 5,
+        "width": 77.2109375,
+        "height": 21
+      },
+      {
+        "text": "BACKLIGHT",
+        "size": 14,
+        "x": 16,
+        "y": 47,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "80",
+        "size": 24,
+        "x": 16,
+        "y": 67,
+        "width": 28.8125,
+        "height": 32
+      },
+      {
+        "text": "%",
+        "size": 14,
+        "x": 48,
+        "y": 77,
+        "width": 10,
+        "height": 19
+      },
+      {
+        "text": "SEEK ZERO",
+        "size": 14,
+        "x": 16,
+        "y": 115,
+        "width": 76.2109375,
+        "height": 19
+      },
+      {
+        "text": "START",
+        "size": 14,
+        "x": 16,
+        "y": 136,
+        "width": 42.60546875,
+        "height": 19
+      },
+      {
+        "text": "LANGUAGE",
+        "size": 14,
+        "x": 16,
+        "y": 179,
+        "width": 67.21875,
+        "height": 19
+      },
+      {
+        "text": "SPANISH",
+        "size": 14,
+        "x": 16,
+        "y": 208,
+        "width": 58.8125,
+        "height": 19
+      },
+      {
+        "text": "BACK",
+        "size": 14,
+        "x": 43,
+        "y": 254,
+        "width": 34.2041015625,
+        "height": 19
+      },
+      {
+        "text": "UNSAVED",
+        "size": 14,
+        "x": 12,
+        "y": 290,
+        "width": 59.408203125,
+        "height": 19
+      }
+    ]
+  }
+]

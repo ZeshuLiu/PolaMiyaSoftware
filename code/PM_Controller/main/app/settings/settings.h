@@ -12,6 +12,8 @@ typedef enum {
     SETTINGS_MOTOR_RUN_MS = 3,
     SETTINGS_BACKLIGHT_PERCENT = 4,
     SETTINGS_FILM_REMAINING = 5,
+    SETTINGS_FOCUS_RAW = 6,
+    SETTINGS_FOCUS_VALID = 7,
 } settings_key_t;
 
 typedef struct {
@@ -20,6 +22,8 @@ typedef struct {
     uint64_t motor_run_ms;
     uint64_t backlight_percent;
     uint64_t film_remaining;
+    uint64_t focus_raw;       /* int32 RAW encoded as uint32 two's complement. */
+    uint64_t focus_valid;     /* 0 before motion; 1 only after confirmed STOP. */
 } settings_values_t;
 
 typedef struct {
@@ -46,6 +50,11 @@ esp_err_t settings_commit_film(void);
 /* Saturating one-shot decrement and film-only save under the same parameter lock.
  * On a write failure retry commit_film(), never this decrement. */
 esp_err_t settings_consume_film(void);
+/* Atomically update and persist only the focus pair, under the parameter lock.
+ * Motion is forbidden unless save_focus(false, ...) succeeds. */
+esp_err_t settings_save_focus(bool valid, int32_t raw);
+/* Read the committed pair, never an uncommitted RAM value. */
+esp_err_t settings_load_focus(bool *valid, int32_t *raw);
 
 /* Explicitly import Rev1 version-2 bytes at 0x20 into RAM; then call commit. */
 esp_err_t settings_import_rev1(void);

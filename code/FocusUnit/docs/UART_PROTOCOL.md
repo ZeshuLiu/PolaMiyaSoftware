@@ -1,6 +1,6 @@
 # FocusUnit UART 协议 v0.1
 
-固件已按本协议实现指令收发，尚未编译或实机验证。调度器启动 700 ms 后自动沿 B 方向寻零；触底校验成功后将当前位置设为 -500 RAW，再自动定位到 0 RAW。零位有效后才能接受 RAW 定位。
+固件已按本协议实现指令收发，尚未编译或实机验证。上电保持制动及未初始化状态，不自动寻零。外部可发送寻零 Glide，或直接设置当前 RAW 完成初始化。寻零触底校验成功后将当前位置设为 -500 RAW，再自动定位到 0 RAW；直接设置当前 RAW 不驱动电机。位置基准有效后才能接受 RAW 定位。
 
 ## 1. 角色与串口参数
 
@@ -41,6 +41,7 @@
 | `0x11` | Glide | 2 | 指定方向运动，选择普通 Glide 或完整寻零 |
 | `0x12` | OpenLoop | 3 | 指定方向及占空比开环驱动 |
 | `0x13` | MoveRaw | 4 | 移动到指定 RAW 位置 |
+| `0x14` | SetCurrentRaw | 4 | 设置当前位置 RAW 并完成初始化，不驱动电机 |
 
 状态查询、ADC 查询及 Stop 的请求 payload 为空，LEN 均为 0。
 
@@ -64,22 +65,33 @@
 | ---: | --- | --- | --- |
 | 0 | target_raw | i32 / 4 | 相对当前零点的软件累计四倍频位置 |
 
-| 指令 | INITIALIZING | NORMAL | ERROR |
-| --- | --- | --- | --- |
-| 状态 / ADC 查询 | BUSY | 零位有效时可查询，否则 BUSY | 零位无效时 BUSY |
-| Stop / Glide / OpenLoop | BUSY | 零位有效时可受理，否则 BUSY | 零位无效时 BUSY |
-| MoveRaw | BUSY | 零位有效时可受理，否则 BUSY | 零位无效时 BUSY |
+**SetCurrentRaw（`0x14`）**
 
-零位尚未确认时，所有合法请求均返回 BUSY，包括状态、ADC 和 Stop；因此 Stop 不能中止寻零，也不是急停命令。寻零失败时零位仍无效，串口请求也返回 BUSY；故障可通过 SWD 查看。
-这段时间的 BUSY 响应不写入去重缓存，零位确认后可重发请求。
+| payload 偏移 | 字段 | 类型 / 字节数 | 取值 |
+| ---: | --- | --- | --- |
+| 0 | current_raw | i32 / 4 | 外部确认的当前位置，完整 int32 范围 |
 
-请求示例（十六进制，包含 CRC；可用于手动重新寻零）：
+此指令将当前位置设为 `current_raw`，重取编码器 CNT 基准，设置 `zero_valid=1`、`work_state=NORMAL`。保持 STOP，不自动定位到 0；数值不是运动目标。正常工作时也仅允许在 STOP 模式重新设置；寻零或运动中返回 BUSY。
+
+| 指令 | 待初始化（INITIALIZING，seek_zero=0） | 寻零中（INITIALIZING，seek_zero=1） | NORMAL | ERROR |
+| --- | --- | --- | --- | --- |
+| 状态 / ADC 查询 | 可查询 | 可查询 | 可查询 | 可查询 |
+| Glide，seek_zero=1 | 启动寻零初始化 | BUSY | 重新寻零 | ERROR |
+| SetCurrentRaw | 设置当前位置，完成初始化 | BUSY | 仅 STOP 模式可受理 | ERROR |
+| Stop / 普通 Glide / OpenLoop / MoveRaw | BUSY | BUSY | 可受理；MoveRaw 要求零位有效 | ERROR |
+
+Stop 不能中止寻零，也不是急停命令。故障锁存保留原行为；寻零失败后可查询错误状态，控制指令返回 ERROR。ADC 没有可用帧时返回 NO_DATA。
+BUSY 响应不写入去重缓存，状态允许后可重发；已受理的寻零及设置当前位置按普通请求去重。
+
+请求示例（十六进制，包含 CRC；可用于上电初始化或手动重新寻零）：
 
 1. 沿 B 方向完整寻零，SEQ=1：`A5 5A 01 00 01 11 02 01 01 9D C3`。
 2. 使用新的 SEQ 查询状态，确认 `work_state=1` 且 `zero_valid=1`：`A5 5A 01 00 02 01 00 0C E6`。
 3. 定位到 +2000 RAW，SEQ=3：`A5 5A 01 00 03 13 04 D0 07 00 00 22 5B`。
 
 寻零响应为受理结果，实际完成须通过状态查询确认。后续查询使用新 SEQ。
+
+另一种初始化方式：将当前位置确认为 +1000 RAW，SEQ=4：`A5 5A 01 00 04 14 04 E8 03 00 00 CD FF`。收到成功响应后位置基准即有效，电机保持停止。
 
 ## 4. FocusUnit 设备响应
 
@@ -100,7 +112,7 @@
 | --- | ---: | --- | ---: |
 | `0x01` | 24 | RESULT + 状态字段 | 1 |
 | `0x02` | 24 | RESULT + ADC 字段 | 1 |
-| `0x10`、`0x11`、`0x12`、`0x13` | 1 | RESULT | 1 |
+| `0x10`、`0x11`、`0x12`、`0x13`、`0x14` | 1 | RESULT | 1 |
 | 未定义 CMD | — | — | 1 |
 
 失败响应只含 RESULT。以下偏移均相对**响应 payload 起始**，从 0 开始，LEN 包含 RESULT。
@@ -115,7 +127,7 @@
 | 3 | direction | u8 / 1 | 0：A；1：B |
 | 4 | duty | u16 / 2 | 已发布的输出占空比，千分比 |
 | 6 | initialized | u8 / 1 | PWM 初始化状态 |
-| 7 | zero_valid | u8 / 1 | 零位是否有效 |
+| 7 | zero_valid | u8 / 1 | 位置基准有效：寻零通过或外部设置当前 RAW |
 | 8 | seek_zero | u8 / 1 | 是否正在执行完整寻零 |
 | 9 | home_attempts | u8 / 1 | 寻零触底次数 |
 | 10 | home_error_counts | i32 / 4 | 最近一次寻零触底清零前位置 |
@@ -126,7 +138,7 @@
 
 | 字段 | 数值及含义 |
 | --- | --- |
-| work_state | 0 INITIALIZING；1 NORMAL；2 ERROR |
+| work_state | 0 INITIALIZING（seek_zero=0 等待初始化，=1 寻零中）；1 NORMAL；2 ERROR |
 | mode | 0 STOP；1 GLIDE；2 OPEN_LOOP；3 ERROR；4 MOVE_RAW |
 | move_state | 0 IDLE；1 MOVING；2 REACHED；3 STALLED；4 CANCELED |
 | initialized、zero_valid、seek_zero、glide_completed | 0 否；1 是 |
@@ -161,6 +173,7 @@
 | 查询运动进展 | 使用新 SEQ 发起新查询 |
 | 同 SEQ、不同 CMD 或 payload | 返回 SEQ_CONFLICT，不改变缓存 |
 | 不同 SEQ | 执行请求并替换最近一次请求和响应缓存 |
+| BUSY 响应 | 不替换去重缓存；状态允许后可重发原请求 |
 | 设备复位 | 缓存丢失；主机重新查询状态，不能假设此前命令是否执行 |
 | 帧格式、版本、类型、CRC 错误或 LEN 超出范围 | 丢弃帧，不响应、不执行；从后续 SOF 重新同步 |
 | 合法帧但命令长度或参数错误 | 返回 BAD_LENGTH 或 BAD_PARAM，不改变运动 |

@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "ui_view.h"
+#include "ui_settings.h"
 
 #include "hc165.h"
 #include "lcd_st7789.h"
@@ -9,8 +10,9 @@
 #include "charge_status.h"
 #include "film_motor.h"
 #include "focus_unit.h"
+#include "focus_position.h"
+#include "focus_calibration.h"
 #include <stdint.h>
-#include <limits.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
@@ -18,7 +20,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#define FOCUS_STEP_RAW 1000
 #define FOCUS_BLINK_HALF_US 312500LL
 #define FILM_CONSUME_AFTER_US 5000000LL
 
@@ -27,55 +28,62 @@ static const char *TAG = "ui";
 /* Only the UI task changes this state after startup. No widget pointer escapes. */
 static struct {
     unsigned page;
-    unsigned brightness;
     unsigned home_func;
-    bool editing;
     bool focus_editing;
+    bool focus_auto;
+    bool focus_too_close;
     bool motor_running;
     bool eject_pending;
     int64_t motor_started_us;
     int64_t eject_started_us;
     int64_t motor_ramp_started_us;
-    const char *save_message;
 } ui;
 
 static void handle_keys(hc165_key_events_t keys)
 {
     /* K3 (top): up/previous/increase. K1 (bottom): down/next/decrease.
      * K2 (middle) owns confirmation and execution. K4-6 are not connected. */
+    if (ui.page == UI_SETUP) {
+        if (ui_settings_handle_keys(keys)) ui.page = UI_HOME;
+        return;
+    }
     if (keys.long_press & HC165_KEY2) {
-        if (ui.page == UI_SETUP) {
-            ESP_ERROR_CHECK(lvgl_port_lock(0) ? ESP_OK : ESP_ERR_TIMEOUT);
-            ui_view_settings(ui.brightness, ui.editing, "SAVING...");
-            lvgl_port_unlock();
-            /* EEPROM I/O can wait; never hold the display mutex while saving. */
-            const esp_err_t result = settings_commit();
-            ui.save_message = result == ESP_OK ? "SAVED" : "SAVE FAILED";
-            if (result != ESP_OK) {
-                ESP_LOGW(TAG, "Settings save failed: %s", esp_err_to_name(result));
-            }
+        if (ui.page == UI_HOME && ui.home_func == UI_HOME_FUNC_FOCUS && !ui.focus_editing) {
+            ui.focus_editing = true;
+            ui.focus_auto = false;
+            ui.focus_too_close = false;
         }
         return;
     }
 
     if (keys.short_press & HC165_KEY2) {
-        if (ui.page == UI_SETUP) {
-            ui.editing = !ui.editing;
-        } else if (ui.page == UI_HOME || ui.page == UI_EJECT) {
+        if (ui.page == UI_HOME || ui.page == UI_EJECT) {
             if (ui.focus_editing) {
                 ui.focus_editing = false;
             } else {
                 switch (ui.home_func) {
                 case UI_HOME_FUNC_SETTINGS:
                     ui.page = UI_SETUP;
-                    ui.editing = false;
+                    ui_settings_open();
                     break;
-                case UI_HOME_FUNC_FOCUS:
-                    ui.focus_editing = true;
+                case UI_HOME_FUNC_FOCUS: {
+                    sdm50_sample_t sample;
+                    int32_t target;
+                    if (sdm50_get_sample(&sample) != ESP_OK) break;
+                    const bool infinity = sample.status == SDM50_NO_TARGET;
+                    const bool too_close = sample.status == SDM50_TOO_CLOSE ||
+                        (sample.status == SDM50_VALID && sample.distance_mm < FOCUS_CALIBRATION_MIN_DISTANCE_MM);
+                    if (sample.status != SDM50_VALID && sample.status != SDM50_TOO_CLOSE && !infinity) break;
+                    const uint32_t distance_mm = too_close ? FOCUS_CALIBRATION_MIN_DISTANCE_MM : sample.distance_mm;
+                    if (focus_distance_to_raw(distance_mm, infinity, &target) &&
+                        focus_position_set_target(target) == ESP_OK) {
+                        ui.focus_auto = true;
+                        ui.focus_too_close = too_close;
+                    }
                     break;
+                }
                 case UI_HOME_FUNC_INFO:
                     ui.page = UI_INFO;
-                    ui.editing = false;
                     break;
                 case UI_HOME_FUNC_EJECT: {
                     const bool running = !ui.motor_running;
@@ -101,7 +109,7 @@ static void handle_keys(hc165_key_events_t keys)
         } else {
             /* INFO: K2 keeps the previous shortcut into SETTINGS. */
             ui.page = UI_SETUP;
-            ui.editing = false;
+            ui_settings_open();
         }
         return;
     }
@@ -116,37 +124,20 @@ static void handle_keys(hc165_key_events_t keys)
     if (ui.page == UI_HOME) {
         if (ui.focus_editing) {
             const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
-            const int32_t current = focus_unit_snapshot(now_ms).desired_raw;
-            int64_t target = (int64_t)current + (next ? FOCUS_STEP_RAW : -FOCUS_STEP_RAW);
-            if (target < 0) target = 0;
-            if (target > INT32_MAX) target = INT32_MAX;
-            focus_unit_set_target((int32_t)target);
+            const int32_t current = focus_position_snapshot(now_ms).desired_raw;
+            int32_t target;
+            if (focus_distance_manual_step(current, next, &target))
+                (void)focus_position_set_target(target);
         } else {
             /* K3 moves up to the previous function, K1 down to the next. */
             ui.home_func = next ? (ui.home_func + UI_HOME_FUNC_COUNT - 1) %
                                       UI_HOME_FUNC_COUNT
                                 : (ui.home_func + 1) % UI_HOME_FUNC_COUNT;
         }
-    } else if (ui.page == UI_SETUP && ui.editing) {
-        unsigned percent = ui.brightness;
-        if (next) {
-            percent = percent > 95 ? 100 : percent + 5;
-        } else {
-            percent = percent < 5 ? 0 : percent - 5;
-        }
-        if (percent != ui.brightness) {
-            const esp_err_t result = settings_set(SETTINGS_BACKLIGHT_PERCENT, percent);
-            if (result == ESP_OK) {
-                ui.brightness = percent;
-                lcd_st7789_set_brightness(percent);
-                ui.save_message = "UNSAVED";
-            } else {
-                ui.save_message = "RAM ERROR";
-            }
-        }
     } else {
         ui.page = (ui.page + (next ? 1 : UI_NAV_PAGE_COUNT - 1)) % UI_NAV_PAGE_COUNT;
         ui.focus_editing = false;
+        if (ui.page == UI_SETUP) ui_settings_open();
     }
 }
 
@@ -160,9 +151,10 @@ static void ui_task(void *argument)
             sample.status = SDM50_RX_ERROR;
         }
         const uint32_t focus_now_ms = (uint32_t)(esp_timer_get_time() / 1000);
-        focus_unit_process(focus_now_ms);
-        const focus_unit_snapshot_t focus_snapshot = focus_unit_snapshot(focus_now_ms);
+        focus_position_process(focus_now_ms);
+        const focus_unit_snapshot_t focus_snapshot = focus_position_snapshot(focus_now_ms);
         const focus_distance_t focus = focus_distance_get(&focus_snapshot);
+        if (ui.page == UI_SETUP) ui_settings_refresh();
 
         power_sample_t power;
         power_monitor_get(&power);
@@ -174,27 +166,22 @@ static void ui_task(void *argument)
         const uint32_t now_ms = (uint32_t)(now / 1000);
         const hc165_inputs_t charge_inputs = hc165_get_inputs();
         const battery_status_t battery = charge_status_update(now_ms, &charge_inputs, &power);
-        const bool focus_visible = !ui.focus_editing ||
-                                   ((now / FOCUS_BLINK_HALF_US) % 2 == 0);
+        const bool focus_visible = ((now / FOCUS_BLINK_HALF_US) % 2 == 0);
 
         ESP_ERROR_CHECK(lvgl_port_lock(0) ? ESP_OK : ESP_ERR_TIMEOUT);
         ui_view_show(ui.page);
         ui_view_eject((uint64_t)(now - ui.motor_started_us) / 1000, &power);
         ui_view_key_hints(ui.page, ui.home_func,
-                          ui.focus_editing || ui.motor_running, ui.editing);
+                          ui.focus_editing || ui.motor_running);
         ui_view_range(&focus, &sample);
-        ui_view_focus_blink(focus_visible);
-        ui_view_power(&power, battery, now_ms);
+        ui_view_focus_style(ui.focus_editing, ui.focus_auto, ui.focus_too_close,
+                            focus.state == FOCUS_DISTANCE_READY, focus_visible);
+        ui_view_power(&power, battery);
         if (settings_available) ui_view_film((unsigned)values.film_remaining);
         ui_view_uptime((uint64_t)(now / 1000000));
         ui_view_info(&values, &status, settings_available);
         ui_view_focus_info(&focus, &focus_snapshot);
-        const char *message = ui.save_message;
-        if (!message) {
-            message = !settings_available || !status.writable ? "STORAGE ERROR" :
-                      status.dirty ? "UNSAVED" : "";
-        }
-        ui_view_settings(ui.brightness, ui.editing, message);
+        if (ui.page == UI_SETUP) ui_settings_render();
         lvgl_port_unlock();
         /* Page changes are immediate; settle film usage after the motor stop ramp. */
         if (ui.eject_pending && !ui.motor_running &&
@@ -221,21 +208,20 @@ static void ui_task(void *argument)
 void ui_start(lv_display_t *display)
 {
     ui.home_func = UI_HOME_FUNC_FOCUS;
+    focus_position_init();
+    ui_settings_init();
 
     settings_values_t values = {0};
-    const bool settings_available = settings_get(&values) == ESP_OK;
-    ui.brightness = settings_available ? (unsigned)values.backlight_percent : 100;
-    lcd_st7789_set_brightness(ui.brightness);
+    settings_get(&values);
     ESP_ERROR_CHECK(lvgl_port_lock(0) ? ESP_OK : ESP_ERR_TIMEOUT);
     ui_view_create(display);
     sdm50_sample_t sample = {.status = SDM50_WAITING};
-    const focus_unit_snapshot_t focus_snapshot = focus_unit_snapshot((uint32_t)(esp_timer_get_time() / 1000));
+    const focus_unit_snapshot_t focus_snapshot = focus_position_snapshot((uint32_t)(esp_timer_get_time() / 1000));
     const focus_distance_t focus = focus_distance_get(&focus_snapshot);
     ui_view_range(&focus, &sample);
-    ui_view_key_hints(UI_HOME, ui.home_func, false, false);
+    ui_view_key_hints(UI_HOME, ui.home_func, false);
     ui_view_film((unsigned)values.film_remaining);
     ui_view_uptime(0);
-    ui_view_settings(ui.brightness, false, "");
     /* Replace the boot screen with the initial page. The backlight is already
      * on in normal startup; the driver makes that second on request a no-op. */
     lv_refr_now(display);

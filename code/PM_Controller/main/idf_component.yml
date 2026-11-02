@@ -1,5 +1,6 @@
 dependencies:
   idf: ">=6.1"
+  espressif/network_provisioning: "1.4.0"
   espressif/esp_lvgl_port: "2.9.0"
   lvgl/lvgl:
     version: "9.3.0"

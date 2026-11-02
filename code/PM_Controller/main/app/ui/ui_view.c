@@ -2,6 +2,7 @@
 #include "ui_key_hints.h"
 #include "ui_home_assets.h"
 #include "ui_eject.h"
+#include "ui_settings.h"
 #include "ui_battery.h"
 
 #include <inttypes.h>
@@ -23,8 +24,11 @@
 #define SCALE_ZERO_X        14
 #define SCALE_20M_X         103
 #define SCALE_INFINITY_X    121
+#define DISTANCE_UNIT_WIDTH 14
+#define DISTANCE_UNIT_GAP   3
 
-#define FONT_SMALL          (&ui_font_info_compact)
+/* INFO-only compact fallback; HOME text must stay at least 14 px. */
+#define FONT_INFO_COMPACT   (&ui_font_info_compact)
 
 /* NEAR belongs only to the measured distance, not the FocusUnit interface. */
 typedef enum {
@@ -37,7 +41,6 @@ typedef enum {
 static struct {
     lv_obj_t *pages[UI_PAGE_COUNT];
     ui_battery_t battery;
-    lv_obj_t *battery_percent;
     lv_obj_t *battery_values;
     lv_obj_t *motor_values;
     lv_obj_t *number_label[2];
@@ -45,6 +48,7 @@ static struct {
     bool unit_visible[2];
     int unit_x[2];
     lv_obj_t *focus_card;
+    lv_obj_t *focus_notice;
     lv_obj_t *focus_pointer;
     lv_obj_t *actual_pointer;
     lv_obj_t *uptime_value;
@@ -56,13 +60,9 @@ static struct {
     lv_obj_t *focus_status;
     lv_obj_t *focus_position;
     lv_obj_t *storage;
-    lv_obj_t *brightness;
-    lv_obj_t *brightness_bar;
-    lv_obj_t *save_status;
-    lv_obj_t *edit_status;
     unsigned page;
-    bool editing;
-    bool focus_visible;
+    uint32_t focus_text_color;
+    uint8_t focus_text_opacity;
     bool focus_editing;
 } view;
 
@@ -92,7 +92,7 @@ static void fit_info_value(lv_obj_t *obj)
     const char *text = lv_label_get_text(obj);
     const lv_font_t *font = lv_text_get_width(text, (uint32_t)strlen(text),
                                               &ui_font_body_bold, 0) > 120
-                                ? FONT_SMALL : &ui_font_body_bold;
+                                ? FONT_INFO_COMPACT : &ui_font_body_bold;
     if (lv_obj_get_style_text_font(obj, 0) != font) {
         lv_obj_set_style_text_font(obj, font, 0);
     }
@@ -171,7 +171,8 @@ static void create_distance_number(lv_obj_t *parent, unsigned number, int x, int
     lv_obj_set_height(view.number_label[number], 58);
     lv_label_set_long_mode(view.number_label[number], LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
-    view.distance_unit[number] = label_font(container, 0, 31, 12, "m",
+    /* 20 px unit shares the distance baseline at container y=48. */
+    view.distance_unit[number] = label_font(container, 0, 27, DISTANCE_UNIT_WIDTH, "m",
                                             color,
                                             &ui_font_unit);
     view.unit_x[number] = 0;
@@ -222,7 +223,8 @@ static void create_film_strip(lv_obj_t *parent)
 void ui_view_create(lv_display_t *display)
 {
     view.page = UI_PAGE_COUNT; /* First show must hide the other pages. */
-    view.focus_visible = true;
+    view.focus_text_color = UINT32_MAX;
+    view.focus_text_opacity = 0;
     view.film_remaining = -1;
 
     lv_obj_t *screen = lv_display_get_screen_active(display);
@@ -240,10 +242,8 @@ void ui_view_create(lv_display_t *display)
         image(home, ui_home_tiles[i].x, ui_home_tiles[i].y, ui_home_tiles[i].image);
     }
     ui_battery_create(&view.battery, home);
-    lv_obj_set_x(lv_obj_get_parent(view.battery.frame), 136);
+    lv_obj_set_x(lv_obj_get_parent(view.battery.frame), 132);
     lv_obj_set_style_bg_color(lv_obj_get_parent(view.battery.frame), lv_color_hex(COLOR_BG), 0);
-    view.battery_percent = label_font(home, 94, 8, 40, "--%", COLOR_MUTED, FONT_SMALL);
-    lv_obj_set_style_text_align(view.battery_percent, LV_TEXT_ALIGN_RIGHT, 0);
 
     view.focus_card = rectangle(home, 8, 130, 120, 85, COLOR_ACCENT);
     lv_obj_set_style_radius(view.focus_card, 4, 0);
@@ -252,6 +252,10 @@ void ui_view_create(lv_display_t *display)
     create_distance_number(home, 0, 8, 155, 0x09291e);
     create_distance_number(home, 1, 8, 60, COLOR_ACTUAL);
     create_distance_scale(home);
+    /* Keep status inside the card, below the large I/E/C marker. The scale
+     * labels occupy y=245..258, so they must not share a status row. */
+    view.focus_notice = label_font(home, 12, 194, 112, "", 0x09291e, &ui_font_body);
+    lv_obj_set_style_text_align(view.focus_notice, LV_TEXT_ALIGN_CENTER, 0);
     create_film_strip(home);
 
     lv_obj_t *info = view.pages[UI_INFO] = page(screen, "DEVICE INFO", NULL);
@@ -270,7 +274,7 @@ void ui_view_create(lv_display_t *display)
     label_font(info, 12, 222, 120, "MOTOR TOTAL", COLOR_MUTED, &ui_font_info_label);
     view.motor_time = label(info, 12, 238, 120, "--", COLOR_TEXT);
     view.focus_status = label_font(info, 12, 257, 120, "F:COMM", COLOR_MUTED, &ui_font_info_label);
-    view.focus_position = label_font(info, 12, 274, 120, "POS --", COLOR_TEXT, &ui_font_info_label);
+    view.focus_position = label_font(info, 12, 274, 120, "FOCUS --", COLOR_TEXT, &ui_font_info_label);
     view.storage = label_font(info, 12, 298, 120, "EEPROM --", COLOR_MUTED, &ui_font_info_label);
     lv_obj_t *info_values[] = {view.battery_values, view.motor_values, view.counts[0],
                                view.counts[1], view.motor_time, view.focus_status, view.focus_position, view.storage};
@@ -279,18 +283,7 @@ void ui_view_create(lv_display_t *display)
         lv_obj_set_height(info_values[i], 18);
     }
 
-    lv_obj_t *setup = view.pages[UI_SETUP] = page(screen, "SETTINGS", NULL);
-    label(setup, 12, 54, 120, "BACKLIGHT", COLOR_MUTED);
-    view.brightness = label(setup, 12, 88, 120, "100 %", COLOR_TEXT);
-    view.brightness_bar = lv_bar_create(setup);
-    lv_obj_set_pos(view.brightness_bar, 12, 128);
-    lv_obj_set_size(view.brightness_bar, 116, 6);
-    lv_obj_set_style_bg_color(view.brightness_bar, lv_color_hex(0x303c39),
-                              LV_PART_MAIN);
-    lv_obj_set_style_bg_color(view.brightness_bar, lv_color_hex(COLOR_ACCENT),
-                              LV_PART_INDICATOR);
-    view.save_status = label(setup, 12, 155, 120, "", COLOR_MUTED);
-    view.edit_status = label(setup, 12, 155, 120, "", COLOR_ACCENT);
+    view.pages[UI_SETUP] = ui_settings_create(screen);
 
     view.pages[UI_EJECT] = ui_eject_create(screen);
 
@@ -313,7 +306,7 @@ void ui_view_show(unsigned page_index)
 }
 
 void ui_view_key_hints(unsigned page_index, unsigned home_func,
-                       bool home_selected, bool setup_editing)
+                       bool home_selected)
 {
     const bool focus_editing = page_index == UI_HOME && home_selected && home_func == UI_HOME_FUNC_FOCUS;
     if (view.focus_editing != focus_editing) {
@@ -324,8 +317,8 @@ void ui_view_key_hints(unsigned page_index, unsigned home_func,
         ui_key_hints_eject();
     } else if (page_index == UI_HOME) {
         ui_key_hints_home(home_func, home_selected);
-    } else {
-        ui_key_hints_page(page_index == UI_SETUP, setup_editing);
+    } else if (page_index == UI_INFO) {
+        ui_key_hints_info();
     }
 }
 
@@ -334,18 +327,12 @@ void ui_view_eject(uint64_t elapsed_ms, const power_sample_t *sample)
     if (view.page == UI_EJECT) ui_eject_update(elapsed_ms, sample);
 }
 
-void ui_view_power(const power_sample_t *sample, battery_status_t battery, uint32_t now_ms)
+void ui_view_power(const power_sample_t *sample, battery_status_t battery)
 {
     if (view.page == UI_HOME) {
-        ui_battery_update(&view.battery, battery, sample->battery_percent, now_ms);
-        if (sample->battery_valid && sample->battery_percent >= 0 &&
-            battery != BATTERY_ABSENT && battery != BATTERY_PENDING) {
-            set_text_fmt(view.battery_percent, "%d%%", sample->battery_percent);
-        } else {
-            set_text(view.battery_percent, "--%");
-        }
+        ui_battery_update(&view.battery, battery, sample->battery_percent);
     }
-    else if (view.page == UI_EJECT) ui_eject_battery(battery, sample->battery_percent, now_ms);
+    else if (view.page == UI_EJECT) ui_eject_battery(battery, sample->battery_percent);
     if (view.page != UI_INFO) return;
     if (battery == BATTERY_ABSENT) {
         set_text(view.battery_values, "NO BATTERY");
@@ -394,7 +381,7 @@ static void set_distance_number(unsigned number, ui_distance_state_t state, uint
     if (lv_obj_get_style_text_font(view.number_label[number], 0) != font) {
         lv_obj_set_style_text_font(view.number_label[number],
                                    font, 0);
-        lv_obj_set_y(view.number_label[number], large ? 0 : valid ? 30 : 8);
+        lv_obj_set_y(view.number_label[number], large ? 0 : valid ? 32 : 8);
         lv_obj_set_style_text_align(view.number_label[number],
                                     valid ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER, 0);
     }
@@ -407,7 +394,7 @@ static void set_distance_number(unsigned number, ui_distance_state_t state, uint
         set_text(view.number_label[number], "--");
     } else if (!large) {
         /* Future values above two integer digits keep the complete value. */
-        set_text_fmt(view.number_label[number], "%u m", value);
+        set_text_fmt(view.number_label[number], "%u", value);
     } else if (submeter) {
         set_text_fmt(view.number_label[number], ".%02u", (unsigned)hundredths);
     } else if (fractional) {
@@ -417,13 +404,13 @@ static void set_distance_number(unsigned number, ui_distance_state_t state, uint
     }
 
     int number_x = 0;
-    if (large) {
+    if (valid) {
         /* Space Mono digits keep equal widths; the decimal has a separately
-         * narrowed advance. Center number, 5 px gap and the 12 px unit box. */
+         * narrowed advance. Center number and the larger independent unit. */
         const char *text = lv_label_get_text(view.number_label[number]);
         const int width = lv_text_get_width(text, (uint32_t)strlen(text), font, 0);
-        number_x = (120 - (width + 5 + 12) + 1) / 2;
-        const int unit_x = number_x + width + 5;
+        number_x = (120 - (width + DISTANCE_UNIT_GAP + DISTANCE_UNIT_WIDTH) + 1) / 2;
+        const int unit_x = number_x + width + DISTANCE_UNIT_GAP;
         if (view.unit_x[number] != unit_x) {
             lv_obj_set_x(view.distance_unit[number], unit_x);
             view.unit_x[number] = unit_x;
@@ -433,10 +420,10 @@ static void set_distance_number(unsigned number, ui_distance_state_t state, uint
         lv_obj_set_x(view.number_label[number], number_x);
         lv_obj_set_width(view.number_label[number], 120 - number_x);
     }
-    if (view.unit_visible[number] != large) {
-        if (large) lv_obj_remove_flag(view.distance_unit[number], LV_OBJ_FLAG_HIDDEN);
+    if (view.unit_visible[number] != valid) {
+        if (valid) lv_obj_remove_flag(view.distance_unit[number], LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(view.distance_unit[number], LV_OBJ_FLAG_HIDDEN);
-        view.unit_visible[number] = large;
+        view.unit_visible[number] = valid;
     }
 }
 
@@ -454,44 +441,25 @@ static void set_distance_pointer(lv_obj_t *pointer, ui_distance_state_t state, u
 
 static void set_focus_number(const focus_distance_t *focus)
 {
+    if (focus->state == FOCUS_DISTANCE_READY) {
+        const ui_distance_state_t state = !focus->distance_valid ? UI_DISTANCE_UNAVAILABLE :
+                                          focus->infinity ? UI_DISTANCE_INFINITY : UI_DISTANCE_FINITE;
+        set_distance_number(0, state, focus->distance_mm);
+        return;
+    }
     lv_obj_t *number = view.number_label[0];
-    const bool ready = focus->state == FOCUS_DISTANCE_READY;
-    char value[32];
-    if (!ready) {
-        const char marker = focus->state == FOCUS_DISTANCE_INITIALIZING ? 'I' :
-                            focus->state == FOCUS_DISTANCE_ERROR ? 'E' : 'C';
-        snprintf(value, sizeof(value), "%c", marker);
-    } else {
-        const uint32_t hundredths = ((uint32_t)focus->target_raw + 500U) / 1000U;
-        if (hundredths < 100) snprintf(value, sizeof(value), ".%02u", (unsigned)hundredths);
-        else snprintf(value, sizeof(value), "%lu.%02u", (unsigned long)(hundredths / 100),
-                      (unsigned)(hundredths % 100));
-    }
-    const int width = ready ? lv_text_get_width(value, (uint32_t)strlen(value), &ui_font_distance, 0) : 0;
-    const bool large = ready && width + 17 <= 120;
-    const lv_font_t *font = !ready ? &ui_font_distance_status : large ? &ui_font_distance : &ui_font_body;
-    if (lv_obj_get_style_text_font(number, 0) != font) lv_obj_set_style_text_font(number, font, 0);
-    const int y = large ? 0 : ready ? 30 : 8;
-    if (lv_obj_get_y(number) != y) lv_obj_set_y(number, y);
-    if (ready && !large) {
-        char full[36];
-        snprintf(full, sizeof(full), "%s m", value);
-        set_text(number, full);
-    } else set_text(number, value);
-    const int x = large ? (120 - width - 17 + 1) / 2 : 0;
-    if (lv_obj_get_x(number) != x) {
-        lv_obj_set_x(number, x);
-        lv_obj_set_width(number, 120-x);
-    }
-    const lv_text_align_t align = large ? LV_TEXT_ALIGN_LEFT : LV_TEXT_ALIGN_CENTER;
-    if (lv_obj_get_style_text_align(number, 0) != align) lv_obj_set_style_text_align(number, align, 0);
-    if (large && view.unit_x[0] != x+width+5) {
-        view.unit_x[0] = x+width+5;
-        lv_obj_set_x(view.distance_unit[0], view.unit_x[0]);
-    }
-    if (view.unit_visible[0] != large) {
-        lv_obj_set_flag(view.distance_unit[0], LV_OBJ_FLAG_HIDDEN, !large);
-        view.unit_visible[0] = large;
+    const char *marker = focus->state == FOCUS_DISTANCE_INITIALIZING ? "I" :
+                         focus->state == FOCUS_DISTANCE_ERROR ? "E" : "C";
+    if (lv_obj_get_style_text_font(number, 0) != &ui_font_distance_status)
+        lv_obj_set_style_text_font(number, &ui_font_distance_status, 0);
+    lv_obj_set_y(number, 8);
+    lv_obj_set_x(number, 0);
+    lv_obj_set_width(number, 120);
+    lv_obj_set_style_text_align(number, LV_TEXT_ALIGN_CENTER, 0);
+    set_text(number, marker);
+    if (view.unit_visible[0]) {
+        lv_obj_add_flag(view.distance_unit[0], LV_OBJ_FLAG_HIDDEN);
+        view.unit_visible[0] = false;
     }
 }
 
@@ -504,20 +472,28 @@ void ui_view_range(const focus_distance_t *focus, const sdm50_sample_t *actual)
                                                                                UI_DISTANCE_UNAVAILABLE;
     set_focus_number(focus);
     set_distance_number(1, actual_state, actual->distance_mm);
-    /* Temporary scale only: RAW / 100 is the placeholder in millimetres. */
-    set_distance_pointer(view.focus_pointer, focus->state == FOCUS_DISTANCE_READY ? UI_DISTANCE_FINITE : UI_DISTANCE_UNAVAILABLE,
-                         (uint32_t)focus->target_raw / 100U);
+    const ui_distance_state_t focus_state = focus->state != FOCUS_DISTANCE_READY || !focus->distance_valid ?
+        UI_DISTANCE_UNAVAILABLE : focus->infinity ? UI_DISTANCE_INFINITY : UI_DISTANCE_FINITE;
+    set_distance_pointer(view.focus_pointer, focus_state, focus->distance_mm);
     set_distance_pointer(view.actual_pointer, actual_state, actual->distance_mm);
 }
 
-void ui_view_focus_blink(bool visible)
+void ui_view_focus_style(bool editing, bool automatic, bool too_close, bool ready, bool blink_on)
 {
     if (view.page != UI_HOME) return;
-    if (view.focus_visible == visible) return;
-    view.focus_visible = visible;
-
-    const uint32_t color = visible ? 0x09291e : COLOR_ACCENT_DIM;
-    lv_obj_set_style_text_color(view.number_label[0], lv_color_hex(color), 0);
+    const uint32_t color = ready && automatic ? (too_close ? 0xa00010 : 0x004080) : 0x09291e;
+    const uint8_t opacity = ready && too_close && automatic && !blink_on ? LV_OPA_TRANSP :
+                            ready && editing && !blink_on ? LV_OPA_40 : LV_OPA_COVER;
+    if (view.focus_text_color != color) {
+        lv_obj_set_style_text_color(view.number_label[0], lv_color_hex(color), 0);
+        lv_obj_set_style_text_color(view.distance_unit[0], lv_color_hex(color), 0);
+        view.focus_text_color = color;
+    }
+    if (view.focus_text_opacity != opacity) {
+        lv_obj_set_style_text_opa(view.number_label[0], opacity, 0);
+        lv_obj_set_style_text_opa(view.distance_unit[0], opacity, 0);
+        view.focus_text_opacity = opacity;
+    }
 }
 
 void ui_view_film(unsigned remaining)
@@ -546,7 +522,7 @@ void ui_view_uptime(uint64_t seconds)
     const lv_font_t *font = lv_text_get_width(value, (uint32_t)strlen(value), &ui_font_uptime, 0) <= 110
                                 ? &ui_font_uptime :
                                   lv_text_get_width(value, (uint32_t)strlen(value), &ui_font_body, 0) <= 110
-                                      ? &ui_font_body : FONT_SMALL;
+                                      ? &ui_font_body : FONT_INFO_COMPACT;
     if (lv_obj_get_style_text_font(view.uptime_value, 0) != font)
         lv_obj_set_style_text_font(view.uptime_value, font, 0);
 }
@@ -576,8 +552,16 @@ void ui_view_info(const settings_values_t *values, const settings_status_t *stat
 
 void ui_view_focus_info(const focus_distance_t *focus, const focus_unit_snapshot_t *snapshot)
 {
+    if (view.page == UI_HOME) {
+        set_text(view.focus_notice, snapshot->storage_error ? "SAVE ERROR" :
+                 focus->state == FOCUS_DISTANCE_COMMUNICATION ? "LINK LOST" :
+                 snapshot->seek_zero ? "HOMING" :
+                 focus->state == FOCUS_DISTANCE_ERROR ? "FOCUS ERROR" :
+                 snapshot->initialization_required ? "INIT NEEDED" : "");
+    }
     if (view.page != UI_INFO) return;
-    const char *state = focus->state == FOCUS_DISTANCE_COMMUNICATION ? "F:COMM" :
+    const char *state = snapshot->storage_error ? "F:SAVE ERROR" :
+                        focus->state == FOCUS_DISTANCE_COMMUNICATION ? "F:COMM" :
                         focus->state == FOCUS_DISTANCE_INITIALIZING ?
                             (snapshot->command_rejected && snapshot->command_result == 3 ? "F:BUSY" : "F:INIT") :
                         focus->state == FOCUS_DISTANCE_ERROR ?
@@ -587,26 +571,21 @@ void ui_view_focus_info(const focus_distance_t *focus, const focus_unit_snapshot
                         snapshot->mode == 1 ? "F:GLIDE" :
                         snapshot->mode == 2 ? "F:OPEN" : "F:READY";
     set_text(view.focus_status, state);
-    if (snapshot->valid) set_text_fmt(view.focus_position, "POS %" PRId32, snapshot->position);
-    else set_text(view.focus_position, "POS --");
+    uint32_t distance_mm = 0;
+    bool infinity = false;
+    if (focus->state != FOCUS_DISTANCE_READY ||
+        !focus_distance_from_raw(snapshot->position, &distance_mm, &infinity)) {
+        set_text(view.focus_position, "FOCUS --");
+    } else if (infinity) {
+        set_text(view.focus_position, "FOCUS INF");
+    } else {
+        const uint64_t hundredths = ((uint64_t)distance_mm + 5U) / 10U;
+        set_text_fmt(view.focus_position, "FOCUS %" PRIu64 ".%02u m",
+                     hundredths / 100U, (unsigned)(hundredths % 100U));
+    }
     const char *text = lv_label_get_text(view.focus_position);
     const lv_font_t *font = lv_text_get_width(text, (uint32_t)strlen(text), &ui_font_info_label, 0) > 120
-                                ? FONT_SMALL : &ui_font_info_label;
+                                ? FONT_INFO_COMPACT : &ui_font_info_label;
     if (lv_obj_get_style_text_font(view.focus_position, 0) != font)
         lv_obj_set_style_text_font(view.focus_position, font, 0);
-}
-
-void ui_view_settings(unsigned percent, bool editing, const char *message)
-{
-    if (view.page != UI_SETUP) return;
-    set_text_fmt(view.brightness, "%u %%", percent);
-    if (view.editing != editing) {
-        lv_obj_set_style_text_color(view.brightness,
-                                    lv_color_hex(editing ? COLOR_ACCENT : COLOR_TEXT), 0);
-        lv_obj_set_y(view.save_status, editing ? 180 : 155);
-    }
-    lv_bar_set_value(view.brightness_bar, (int32_t)percent, LV_ANIM_OFF);
-    set_text(view.edit_status, editing ? "EDITING" : "");
-    set_text(view.save_status, message);
-    view.editing = editing;
 }

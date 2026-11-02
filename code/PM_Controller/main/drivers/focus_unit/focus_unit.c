@@ -5,19 +5,19 @@
 
 #define PORT UART_NUM_2
 #define CMD_STATUS 0x01
-#define CMD_MOVE 0x13
 #define TIMEOUT_MS 100U
-#define POLL_MS 1000U
+#define ACTIVE_POLL_MS 100U
+#define IDLE_POLL_MS 1000U
 #define STALE_MS 2500U
 #define MAX_FRAME 73
 
 static struct {
-    bool ready, inflight, sending, pending, edited, adopted, valid, comm_failed;
+    bool ready, inflight, sending, valid, comm_failed;
     uint8_t next_seq, seq, cmd, retries, frame[MAX_FRAME], frame_len, tx_offset;
     uint8_t rx[MAX_FRAME], rx_len;
     uint32_t sent_ms, last_poll_ms, last_status_ms, command_ms;
+    uint32_t poll_ms;
     bool command_rejected;
-    int32_t desired;
     focus_unit_snapshot_t status;
 } link;
 
@@ -59,18 +59,25 @@ static void advance_transmit(uint32_t now_ms)
     }
 }
 
-static void start_request(uint8_t cmd, uint32_t now_ms)
+static void start_request(uint8_t cmd, int32_t raw, uint32_t now_ms)
 {
-    const uint8_t len = cmd == CMD_MOVE ? 4 : 0;
+    const uint8_t len = cmd == FOCUS_UNIT_MOVE || cmd == FOCUS_UNIT_SET_CURRENT ? 4 :
+                        cmd == FOCUS_UNIT_HOME ? 2 : 0;
     link.frame[0] = 0xa5; link.frame[1] = 0x5a;
     link.frame[2] = 1; link.frame[3] = 0;
     link.seq = link.next_seq++; link.cmd = cmd;
     link.frame[4] = link.seq; link.frame[5] = cmd; link.frame[6] = len;
-    if (len) {
-        const uint32_t value = (uint32_t)link.desired;
+    if (len == 4) {
+        const uint32_t value = (uint32_t)raw;
         for (unsigned i = 0; i < 4; ++i) link.frame[7+i] = (uint8_t)(value >> (8*i));
-        link.pending = false;
-    } else link.last_poll_ms = now_ms;
+    } else if (len == 2) {
+        link.frame[7] = 1; /* B direction */
+        link.frame[8] = 1; /* complete homing */
+    }
+    if (cmd == CMD_STATUS) link.last_poll_ms = now_ms;
+    /* Sending a control is not a communication failure. Keep the last fresh
+     * status for display; the application uses status_sequence to require a
+     * new query before accepting any post-command completion or STOP state. */
     const uint16_t crc = crc16(link.frame + 2, 5 + len);
     link.frame[7+len] = (uint8_t)crc; link.frame[8+len] = (uint8_t)(crc >> 8);
     link.frame_len = 9 + len;
@@ -99,16 +106,14 @@ static void receive_frame(const uint8_t *p, uint32_t now_ms)
         s->position=signed32(data+14); s->target_raw=signed32(data+18);
         s->move_state=data[22]; s->glide_completed=data[23];
         link.last_status_ms=now_ms; link.valid=true; link.comm_failed=false;
-        if (!link.adopted) {
-            link.adopted=true;
-            if (!link.edited && s->target_raw >= 0) link.desired=s->target_raw;
-        }
-    } else if (link.cmd == CMD_MOVE) {
+        ++s->status_sequence;
+    } else if (link.cmd != CMD_STATUS) {
         /* An ACK is acceptance only; status polling supplies actual progress. */
         link.status.command_result=data[0];
         link.command_rejected=data[0] != 0; link.command_ms=now_ms;
+        ++link.status.control_sequence;
         link.comm_failed=false;
-        link.last_poll_ms=now_ms-POLL_MS;
+        link.last_poll_ms=now_ms-link.poll_ms;
     } else {
         link.valid=false; link.comm_failed=true;
         link.last_poll_ms=now_ms;
@@ -147,22 +152,32 @@ esp_err_t focus_unit_init(void)
     err=uart_driver_install(PORT, 512, 0, 0, NULL, 0);
     if (err != ESP_OK) return err;
     link.ready=true;
+    link.poll_ms=IDLE_POLL_MS;
     /* Unsigned subtraction makes the first status request due immediately. */
-    link.last_poll_ms=(uint32_t)-POLL_MS;
+    link.last_poll_ms=(uint32_t)-IDLE_POLL_MS;
     return ESP_OK;
 }
 
-void focus_unit_set_target(int32_t target_raw)
+esp_err_t focus_unit_request(focus_unit_command_t command, int32_t raw, uint32_t now_ms)
 {
-    if (target_raw < 0 || target_raw == link.desired) return;
-    link.desired=target_raw;
-    link.edited=true;
-    link.pending=true; /* New values replace only the unsent request. */
+    if (command != FOCUS_UNIT_STOP && command != FOCUS_UNIT_HOME &&
+        command != FOCUS_UNIT_MOVE && command != FOCUS_UNIT_SET_CURRENT)
+        return ESP_ERR_INVALID_ARG;
+    if (!link.ready || link.inflight) return ESP_ERR_INVALID_STATE;
+    start_request((uint8_t)command, raw, now_ms);
+    advance_transmit(now_ms); /* Queue control bytes now, without another UI tick. */
+    return ESP_OK;
+}
+
+void focus_unit_set_active(bool active)
+{
+    link.poll_ms = active ? ACTIVE_POLL_MS : IDLE_POLL_MS;
 }
 
 void focus_unit_process(uint32_t now_ms)
 {
     if (!link.ready) return;
+    const uint32_t status_before = link.status.status_sequence;
     uint8_t bytes[64];
     int count;
     unsigned budget = 512;
@@ -181,12 +196,18 @@ void focus_unit_process(uint32_t now_ms)
         else {
             link.inflight=false; link.sending=false; link.valid=false;
             link.comm_failed=true; link.rx_len=0;
+            if (link.cmd != CMD_STATUS) {
+                link.status.command_result=0xff; /* Result unknown; never replay with a new SEQ. */
+                link.command_rejected=true; link.command_ms=now_ms;
+                ++link.status.control_sequence;
+            }
             link.last_poll_ms=now_ms; /* No automatic replay of uncertain motion. */
         }
     }
-    if (!link.inflight) {
-        if (link.pending) start_request(CMD_MOVE, now_ms);
-        else if ((uint32_t)(now_ms-link.last_poll_ms) >= POLL_MS) start_request(CMD_STATUS, now_ms);
+    if (!link.inflight && link.status.status_sequence == status_before) {
+        /* Let the application act on a new status before starting another
+         * query, even when a slow UI cycle already exceeded the poll period. */
+        if ((uint32_t)(now_ms-link.last_poll_ms) >= link.poll_ms) start_request(CMD_STATUS, 0, now_ms);
     }
     if (link.inflight && link.sending) advance_transmit(now_ms);
 }
@@ -198,6 +219,5 @@ focus_unit_snapshot_t focus_unit_snapshot(uint32_t now_ms)
             (uint32_t)(now_ms-link.last_status_ms) < STALE_MS;
     s.command_rejected=link.ready && !link.comm_failed && link.command_rejected &&
                      (s.valid || (uint32_t)(now_ms-link.command_ms) < STALE_MS);
-    s.desired_raw=link.desired;
     return s;
 }

@@ -8,6 +8,7 @@
 
 static DRAM_ATTR struct {
     gptimer_handle_t timer;
+    bool output_prepared;
     bool initialized;
     bool busy;
     int64_t ready_after_us;
@@ -31,13 +32,18 @@ static bool IRAM_ATTR pulse_done(gptimer_handle_t timer,
 
 esp_err_t flash_trigger_prepare_output(void)
 {
+    /* Startup calls this before LCD setup and again from full init. Reserve
+     * the GPIO once; repeating gpio_config triggers IDF's ownership warning. */
+    if (flash.output_prepared) return ESP_OK;
     gpio_set_level(PIN_FLASH_TRG, 0);
     const gpio_config_t output = {
         .pin_bit_mask = 1ULL << PIN_FLASH_TRG,
         .mode = GPIO_MODE_OUTPUT,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    return gpio_config(&output);
+    const esp_err_t result = gpio_config(&output);
+    if (result == ESP_OK) flash.output_prepared = true;
+    return result;
 }
 
 esp_err_t flash_trigger_init(void)

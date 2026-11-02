@@ -12,6 +12,7 @@
 enum { FUNC_SETTINGS, FUNC_FOCUS, FUNC_EJECT, FUNC_INFO, FUNC_COUNT };
 static lv_obj_t *rail, *top_key, *bottom_key, *middle;
 static lv_obj_t *icons[3][FUNC_COUNT], *up, *down, *left, *right, *plus, *minus, *done, *stop;
+static lv_obj_t *menu_enter, *menu_play, *menu_busy;
 static int last_mode = -1;
 static unsigned last_func;
 static bool last_edit;
@@ -67,6 +68,14 @@ void ui_key_hints_create(lv_obj_t *screen)
     right=line(top_key,right_points,3); left=line(bottom_key,left_points,3);
     plus=box(top_key,0,0,28,34,0,0); line(plus,h,2); line(plus,v,2);
     minus=line(bottom_key,h,2); done=line(middle,check,3);
+    static const lv_point_precise_t enter_points[] = {{10,13},{19,22},{10,31}};
+    static const lv_point_precise_t play_points[] = {{10,13},{20,22},{10,31},{10,13}};
+    menu_enter=line(middle,enter_points,3);
+    menu_play=line(middle,play_points,4);
+    lv_obj_set_style_line_color(menu_enter,lv_color_hex(GREEN),0);
+    lv_obj_set_style_line_color(menu_play,lv_color_hex(GREEN),0);
+    menu_busy=box(middle,0,0,30,44,0,0);
+    for(unsigned i=0;i<3;++i) box(menu_busy,6+(int)i*7,20,4,4,0x9ce8ba,LV_RADIUS_CIRCLE);
     const lv_image_dsc_t *images[] = {&ui_icon_gear_current, &ui_icon_focus_current,
                                        &ui_icon_eject_current, &ui_icon_info_current};
     /* Center the three-icon group between separators y=84/244.
@@ -96,12 +105,14 @@ static void reset(void)
     show(rail,true); show(stop,false);
     show(up,false); show(down,false); show(left,false); show(right,false);
     show(plus,false); show(minus,false); show(done,false);
+    show(menu_enter,false); show(menu_play,false); show(menu_busy,false);
     for(unsigned i=0;i<3;++i) for(unsigned f=0;f<FUNC_COUNT;++f) show(icons[i][f],false);
 }
 
 static void center(unsigned func, bool editing)
 {
     lv_obj_set_style_bg_color(middle,lv_color_hex(editing ? AMBER : INK),0);
+    lv_obj_set_style_line_color(done,lv_color_hex(INK),0);
     if(editing) show(done,true); else show(icons[1][func],true);
 }
 
@@ -120,18 +131,35 @@ void ui_key_hints_home(unsigned current, bool editing)
     }
 }
 
-void ui_key_hints_page(bool setup_page, bool editing)
+void ui_key_hints_info(void)
 {
-    int mode=setup_page ? (editing ? 3 : 2) : 1;
-    if(last_mode==mode) return;
-    last_mode=mode; reset();
-    center(FUNC_SETTINGS,editing);
-    if(editing) { show(plus,true); show(minus,true); }
-    else { show(right,true); show(left,true); }
+    if(last_mode==1) return;
+    last_mode=1; reset();
+    center(FUNC_SETTINGS,false);
+    show(right,true); show(left,true);
 }
 
 void ui_key_hints_eject(void)
 {
     if(last_mode==4) return;
     last_mode=4; show(rail,false); show(stop,true);
+}
+
+void ui_key_hints_menu(ui_menu_hint_t hint)
+{
+    const int mode=5+(int)hint;
+    if(last_mode==mode) return;
+    last_mode=mode; reset();
+    const bool editing=hint==UI_MENU_HINT_NUMBER || hint==UI_MENU_HINT_CHOICE;
+    const bool disabled=hint==UI_MENU_HINT_BUSY || hint==UI_MENU_HINT_DISABLED;
+    lv_obj_set_style_bg_color(middle,lv_color_hex(disabled ? 0x365148 : editing ? AMBER : INK),0);
+    if(hint==UI_MENU_HINT_NUMBER) { show(plus,true); show(minus,true); }
+    else { show(up,true); show(down,true); }
+    if(disabled) show(menu_busy,true);
+    else if(hint==UI_MENU_HINT_ACTION) show(menu_play,true);
+    else if(hint==UI_MENU_HINT_OPEN) show(menu_enter,true);
+    else {
+        lv_obj_set_style_line_color(done,lv_color_hex(editing ? INK : GREEN),0);
+        show(done,true);
+    }
 }

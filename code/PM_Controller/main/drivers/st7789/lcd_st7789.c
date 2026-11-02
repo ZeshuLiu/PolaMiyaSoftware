@@ -55,14 +55,11 @@ void lcd_st7789_init(lcd_st7789_t *lcd)
 {
     /* Preload the output latch before enabling the active-low backlight. */
     ESP_ERROR_CHECK(gpio_set_level(PIN_LCD_BLK, 1));
-    const gpio_config_t backlight_config = {
-        .pin_bit_mask = 1ULL << PIN_LCD_BLK,
-        .mode = GPIO_MODE_OUTPUT,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-    ESP_ERROR_CHECK(gpio_config(&backlight_config));
+    /* Hold the active-low backlight off while configuring PWM. The channel
+     * owns/reserves this pad; avoid reserving it first through gpio_config. */
+    gpio_intr_disable(PIN_LCD_BLK);
+    gpio_set_pull_mode(PIN_LCD_BLK, GPIO_FLOATING);
+    ESP_ERROR_CHECK(gpio_set_direction(PIN_LCD_BLK, GPIO_MODE_OUTPUT));
 
     const ledc_timer_config_t backlight_timer = {
         .speed_mode = BACKLIGHT_MODE,

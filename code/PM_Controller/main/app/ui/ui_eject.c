@@ -193,7 +193,7 @@ void ui_eject_update(uint64_t elapsed_ms, const power_sample_t *sample)
     }
 }
 
-void ui_eject_battery(battery_status_t state, int percent, uint32_t now_ms)
+void ui_eject_battery(battery_status_t state, int percent)
 {
-    ui_battery_update(&eject.battery, state, percent, now_ms);
+    ui_battery_update(&eject.battery, state, percent);
 }

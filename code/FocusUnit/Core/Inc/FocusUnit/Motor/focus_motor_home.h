@@ -19,6 +19,7 @@ typedef struct {
 /* 读取上电/复位原因，恢复跨复位故障锁存；仅上电复位清除锁存。 */
 void FocusMotor_HomeBoot(void);
 void FocusMotor_HomeStart(FocusMotor_Direction direction);
+void FocusMotor_HomeSetCurrentRaw(int32_t current_raw);
 void FocusMotor_HomeFail(void);
 const FocusMotor_HomeStatus *FocusMotor_HomeGetStatus(void);
 /* touched 由 Motor 在已制动后传入；触底时先读编码器位置、比较，再置零。 */

@@ -1,5 +1,7 @@
 # 闪光触发输出
 
+2026-11-02：修正启动 `flash_trigger_init begin` 后的 `conflict found for GPIO[38]`。主程序提前预置输出和完整初始化此前都会调用 `gpio_config()`，ESP-IDF 6.1 在第二次预留相同输出脚时产生占用警告。现在 `flash_trigger_prepare_output()` 成功配置一次后记录状态，重复调用直接复用；配置失败不置成功标记，允许后续初始化重试。GPIO38 仍在屏幕初始化前置低，完整初始化只补建定时器，脉冲控制逻辑不变。本次只做源码静态核对，未编译、测试或烧录；该警告没有被确认为此前 StoreProhibited 的根因。
+
 GPIO38 高电平经 R25 驱动 TLP291，默认低电平。`flash_trigger_init()` 在开机时配置 GPIO 并创建、启用 GPTimer；初始化不触发闪光。
 
 2026-10-19：新增启动阶段的 `flash_trigger_prepare_output()`，只预置低电平并配置 GPIO，不创建定时器。主程序在较慢的屏幕初始化前调用它；完整 `flash_trigger_init()` 和快门 ISR 在开机画面显示后初始化。完整初始化仍复用同一输出配置，触发脉冲和恢复时序未改。本轮未编译、未上板验证。
@@ -16,6 +18,7 @@ GPIO ISR 直接输出减少任务调度延迟，但不保证外部边沿到输�
 
 | 接口 | 内容 |
 | --- | --- |
+| `flash_trigger_prepare_output()` | 启动阶段预置低电平并配置 GPIO；重复调用复用已完成配置 |
 | `flash_trigger_init()` | 任务上下文初始化，先于快门中断和其他消费者 |
 | `flash_trigger_fire()` | 在任务或普通 GPIO ISR 中触发默认 20 ms 脉冲 |
 | `flash_trigger_fire_us(pulse_us)` | 同上，指定 1000–30000 µs |

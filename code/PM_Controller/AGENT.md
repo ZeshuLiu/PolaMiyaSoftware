@@ -55,7 +55,7 @@ flash_trigger_prepare_output（GPIO38 低电平）→ film_motor_init（GPIO1/2 
 | 开机画面 | [app/boot_screen](main/app/boot_screen/README.md)；`boot_screen_start/begin/complete/finish()` | 启动任务调用，六行初始化状态、白底黑狗及出厂 MAC；外设初始化不持有显示锁；完成后由 `ui_start()` 接管 |
 | 竖屏 UI | [app/ui](main/app/ui/README.md)；`ui_start()` | 默认启动三页界面；只使用 KEY1–3，KEY4–6 暂未接线；UI 为 HC165 事件唯一消费者，EEPROM 保存不得持有 LVGL 锁 |
 | FocusUnit UART | [drivers/focus_unit](main/drivers/focus_unit/README.md)；`focus_unit_init/process` | UART2 GPIO18/17，单请求、状态查询和 MoveRaw；UI 任务独占，初始化失败不阻止启动 |
-| 对焦物距 | [app/focus_distance](main/app/focus_distance/README.md)；`focus_distance_get()` | FocusUnit RAW 命令目标及 I/E/C 状态；显示比例 RAW / 100000 与标尺仅为占位，物距标定待接入 |
+| 对焦物距 | [app/focus_distance](main/app/focus_distance/README.md)；`focus_distance_get()` | FocusUnit RAW 命令目标及 I/E/C 状态；显示比例 RAW / 50000 与标尺仅为占位，物距标定待接入 |
 | ADC 采样 | [drivers/adc_measure](main/drivers/adc_measure/README.md)；`adc_measure_init/get()` | ADC1 GPIO3/CH2、GPIO8/CH7；最低连续 DMA 总采样率 611 Hz，每路约 305.5 Hz、31 样本/窗口；校准和 IIR；禁止同时占用 ADC1 oneshot |
 | 电源显示 | [app/power_monitor](main/app/power_monitor/README.md)；`power_monitor_get()` | 用户确认单节 4.2 V 锂电池；电压乘 2、通用节点估算电量；IPROPI 按 R2=1 kΩ、1575 µA/A 换算；未实现低压/过流/堵转保护 |
 | 屏幕测试 | [app/lcd_test](main/app/lcd_test/)；`lcd_test_start()` | CASE 7 帧率与圆角排查源码保留，默认不启动；不得与 UI 同时运行 |
@@ -65,6 +65,10 @@ flash_trigger_prepare_output（GPIO38 低电平）→ film_motor_init（GPIO1/2 
 | 闪光输出 | [drivers/flash_trigger](main/drivers/flash_trigger/README.md)；`flash_trigger_fire()` | GPIO38 直接拉高，GPTimer 中断拉低；支持任务及普通 GPIO ISR；20 ms 目标脉宽、至少 1 ms 低电平恢复，忙时拒绝、不排队 |
 
 ### LVGL 与背光
+
+- SETUP 采用 `ui_menu` / `ui_menu_view` / `ui_settings`：描述表注册实际项目，支持数值、执行、少量选项和多选项子列表。参数快照及回调在显示锁外处理，渲染只读缓存；当前只注册背光、寻零和返回，扩展见 [菜单说明](main/app/ui/MENU.md)。
+
+- 2026-11-02 用户确认 HOME 可见文字最小 14 px；主屏电池仅图标，不显示百分比数字。INFO 的紧凑字形不可复用于 HOME，空间不足时缩短文案或调整布局，不降低 HOME 字号。
 
 - 逻辑尺寸 172×320；用户确认方向 7：LVGL ROT 180、gap=(34,0)。业务 UI 使用默认刷新定时器，`lcd_test` 保留但默认不启动。
 - 屏幕右侧实体键从上到下为 KEY3、KEY2、KEY1。后续 UI 统一沿用：KEY3=上/右/增加，KEY1=下/左/减少，KEY2=确认/执行。横向切页使用左右箭头，纵向菜单使用上下箭头；确认、编辑完成及保存均放在 KEY2，当前 SETUP 长按 KEY2 保存。不能将执行功能重新放到 KEY1/3。顶部区域 30 px、电池主体 19×10 px；HOME / INFO / SETUP 侧栏宽 36 px，仅显示图标，实际按键高度待测量。
@@ -105,6 +109,8 @@ flash_trigger_prepare_output（GPIO38 低电平）→ film_motor_init（GPIO1/2 
 - 当前 GPIO 中断和 GPTimer 控制调用链不支持 cache 关闭期间执行；不承诺绝对零延迟。不得仅给入口加 IRAM_ATTR 就宣称全链路 IRAM 安全。
 
 ## 任务与 ISR
+
+- `app/diagnostics` 由主任务在应用任务创建后注册句柄，每 30 s 记录任务最小剩余栈并检查内部堆元数据；在显示锁外运行。链接后脚本按 ELF SHA 保存符号至被忽略的 `.firmware_archive/`，不得用与崩溃 SHA 不同的 ELF 下准确定位结论。说明见 [异常定位](main/app/diagnostics/README.md)；当前内存异常根因未确认，定位代码未编译或实测。
 
 - SDM50 独占 UART1（GPIO4/5）与 UHCI，460800、8N1，使用官方 UHCI DMA 收发。DMA ISR 直接解析并更新快照，同核任务只负责 EOF 后重新挂载；不要同时安装普通 UART 接收驱动。公开接口仅任务上下文；启停等待应答，UI 的 ACTUAL 只消费 VALID 快照。详见 `main/drivers/sdm50/README.md`；用户于 2026-10-15 确认编译通过；未运行测试、未上板验证。
 

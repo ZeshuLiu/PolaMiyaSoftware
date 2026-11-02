@@ -20,8 +20,14 @@ esp_err_t film_motor_init(void)
     /* Establish braking before connecting PWM to IN1 at zero drive duty. */
     ESP_RETURN_ON_ERROR(gpio_set_level(PIN_MOTORPWM_A, 1), TAG, "IN1 idle");
     ESP_RETURN_ON_ERROR(gpio_set_level(PIN_MOTOR_IN2, 1), TAG, "IN2 idle");
+    /* IN1 is temporarily a plain high output until LEDC connects its prepared
+     * inverted-zero-duty signal. Let LEDC reserve this output path once;
+     * gpio_config would reserve it here and cause a false ownership conflict. */
+    gpio_intr_disable(PIN_MOTORPWM_A);
+    gpio_set_pull_mode(PIN_MOTORPWM_A, GPIO_FLOATING);
+    ESP_RETURN_ON_ERROR(gpio_set_direction(PIN_MOTORPWM_A, GPIO_MODE_OUTPUT), TAG, "IN1 safe output");
     const gpio_config_t pins = {
-        .pin_bit_mask = (1ULL << PIN_MOTORPWM_A) | (1ULL << PIN_MOTOR_IN2),
+        .pin_bit_mask = 1ULL << PIN_MOTOR_IN2,
         .mode = GPIO_MODE_OUTPUT,
         .intr_type = GPIO_INTR_DISABLE,
     };

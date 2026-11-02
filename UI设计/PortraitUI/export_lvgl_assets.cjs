@@ -129,7 +129,7 @@ function font(name, data) {
         // Small white RGBA masks are recolored by both black-header widgets.
         // The full check uses the approved one-pixel-raised offset in its source.
         const batteryDefs = batterySvg.match(/<defs>[\s\S]*?<\/defs>/)[0];
-        for (const [name,w,h] of [['frame',22,10],['bolt',4,10],['check',19,10],['slash',19,10]]) {
+        for (const [name,w,h] of [['frame',22,10],['bolt',8,14],['check',19,10],['slash',19,10]]) {
             await raster(`ui_battery_${name}`,`<use href="#battery-${name}"/>`,w,h,
                          {alpha:true,assetDefs:definitions+batteryDefs});
         }
@@ -188,6 +188,7 @@ function font(name, data) {
             ['body',14,400,20,4,true,'Roboto Mono'],
             ['body_bold',14,700,20,4,true,'Roboto Mono'],
             ['home_title',16,700,22,5,' ACFLOSTU','Roboto Mono'],
+            ['menu_title',16,700,22,5,' -0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ','Roboto Mono'],
             ['info_label',12,600,17,4,true,'Roboto Mono'],['small',10,400,16,4,true,'Roboto Mono'],
             ['info_compact',9,400,15,4,true,'Roboto Mono'],
             ['eject_fallback',12,500,18,4,false,'Roboto Mono'],
@@ -195,7 +196,7 @@ function font(name, data) {
             ['eject_time',28,700,36,7,'-.0123456789:','Space Mono'],
             ['eject_current',42,700,50,9,'-.0123456789','Space Mono'],
             ['distance_status',30,600,40,8,' -ACEFINR','Roboto Mono'],['uptime',20,700,26,5,false,'Roboto Mono'],
-            ['unit',15,700,22,5,'m','Roboto Mono'],
+            ['unit',20,700,26,5,'m','Roboto Mono'],
             ['count',24,700,30,6,false,'Roboto Mono'],
             ['boot_label',8,400,12,3,' ./:0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-','Roboto Mono'],
             ['boot_log',9,500,14,3,' .ABCDEFGHIJKLMNOPQRSTUVWXYZ[]','Roboto Mono'],

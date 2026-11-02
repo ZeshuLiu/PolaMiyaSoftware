@@ -14,8 +14,10 @@
 #include "esp_log.h"
 #include "adc_measure.h"
 #include "power_monitor.h"
+#include "runtime_diagnostics.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 
 static const char *TAG = "main";
 
@@ -67,6 +69,39 @@ static void log_distance(void)
         ESP_LOGW(TAG, "SDM50: unknown status %d", (int)sample.status);
         break;
     }
+}
+
+typedef struct {
+    SemaphoreHandle_t done;
+    esp_err_t result;
+} focus_init_context_t;
+
+/* UART installs its ISR on the calling core. Keep initialization and any
+ * failure cleanup on CPU1, while normal UART API calls remain task-safe. */
+static void focus_init_on_cpu1(void *argument)
+{
+    focus_init_context_t *context = argument;
+    ESP_LOGI(TAG, "FocusUnit UART init on CPU %d", (int)xPortGetCoreID());
+    context->result = focus_unit_init();
+    xSemaphoreGive(context->done);
+    vTaskDelete(NULL);
+}
+
+static esp_err_t focus_init_with_cpu1_interrupt(void)
+{
+    focus_init_context_t context = {.done = xSemaphoreCreateBinary(), .result = ESP_FAIL};
+    if (!context.done) return ESP_ERR_NO_MEM;
+    if (xTaskCreatePinnedToCore(focus_init_on_cpu1, "focus_init", 3072, &context,
+                                3, NULL, 1) != pdPASS) {
+        vSemaphoreDelete(context.done);
+        return ESP_ERR_NO_MEM;
+    }
+    /* The child owns context until signaling; no timeout that could leave it
+     * pointing to an expired stack frame. */
+    xSemaphoreTake(context.done, portMAX_DELAY);
+    const esp_err_t result = context.result;
+    vSemaphoreDelete(context.done);
+    return result;
 }
 
 void app_main(void)
@@ -152,7 +187,7 @@ void app_main(void)
     boot_screen_complete(adc_result);
     boot_screen_finish();
 
-    const esp_err_t focus_result = focus_unit_init();
+    const esp_err_t focus_result = focus_init_with_cpu1_interrupt();
     if (focus_result != ESP_OK) ESP_LOGW(TAG, "FocusUnit UART init failed: %s", esp_err_to_name(focus_result));
     ESP_LOGI(TAG, "ui_start begin");
     ui_start(display);
@@ -162,6 +197,7 @@ void app_main(void)
         ESP_LOGW(TAG, "Film reload task start failed: %s", esp_err_to_name(film_reload_result));
     }
     ESP_LOGI(TAG, "app_main initialization complete");
+    runtime_diagnostics_init();
 
     TickType_t last_log_tick = xTaskGetTickCount();
     uint64_t pending_shutters = 0;
@@ -171,7 +207,7 @@ void app_main(void)
         vTaskDelayUntil(&last_log_tick, pdMS_TO_TICKS(1000));
         const uint64_t edges = shutter_take_count();
         pending_shutters = UINT64_MAX - pending_shutters < edges
-                           ? UINT64_MAX : pending_shutters + edges;
+                            ? UINT64_MAX : pending_shutters + edges;
         esp_err_t count_result = ESP_OK;
         if (pending_shutters) {
             count_result = settings_increment(SETTINGS_SHUTTER_COUNT, pending_shutters);
@@ -191,5 +227,6 @@ void app_main(void)
         }
         log_distance();
         log_power();
+        runtime_diagnostics_poll();
     }
 }

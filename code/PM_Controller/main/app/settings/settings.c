@@ -15,6 +15,7 @@ static struct {
     settings_values_t persisted_values;
     settings_status_t status;
     int active_record;
+    bool commit_uncertain;
 } store;
 
 static bool sequence_is_newer(uint32_t candidate, uint32_t current)
@@ -125,7 +126,7 @@ esp_err_t settings_set(settings_key_t key, uint64_t value)
     xSemaphoreTake(store.mutex, portMAX_DELAY);
     const esp_err_t result = settings_values_set(&store.values, key, value);
     if (result == ESP_OK) {
-        store.status.dirty = !store.status.loaded_from_eeprom ||
+        store.status.dirty = store.commit_uncertain || !store.status.loaded_from_eeprom ||
             memcmp(&store.values, &store.persisted_values, sizeof(store.values)) != 0;
     }
     xSemaphoreGive(store.mutex);
@@ -140,7 +141,7 @@ esp_err_t settings_increment(settings_key_t key, uint64_t amount)
     xSemaphoreTake(store.mutex, portMAX_DELAY);
     const esp_err_t result = settings_values_increment(&store.values, key, amount);
     if (result == ESP_OK) {
-        store.status.dirty = !store.status.loaded_from_eeprom ||
+        store.status.dirty = store.commit_uncertain || !store.status.loaded_from_eeprom ||
             memcmp(&store.values, &store.persisted_values, sizeof(store.values)) != 0;
     }
     xSemaphoreGive(store.mutex);
@@ -186,7 +187,7 @@ static esp_err_t write_record(unsigned int index, const uint8_t *record)
 static esp_err_t commit_values_locked(const settings_values_t *values)
 {
     esp_err_t result = store.status.writable ? ESP_OK : store.status.storage_error;
-    if (result == ESP_OK && (!store.status.loaded_from_eeprom ||
+    if (result == ESP_OK && (store.commit_uncertain || !store.status.loaded_from_eeprom ||
                             memcmp(values, &store.persisted_values, sizeof(*values)) != 0)) {
         uint8_t record[SETTINGS_RECORD_BYTES];
         const unsigned int next = store.active_record < 0 ? 0
@@ -194,6 +195,9 @@ static esp_err_t commit_values_locked(const settings_values_t *values)
         const uint32_t sequence = store.status.sequence + 1;
         settings_record_encode(values, sequence, record);
         result = write_record(next, record);
+        /* A failed final readback may hide a physically committed record. Even
+         * equal values must overwrite and verify that slot before motion. */
+        store.commit_uncertain = result != ESP_OK;
         if (result == ESP_OK) {
             store.active_record = (int)next;
             store.status.sequence = sequence;
@@ -201,7 +205,7 @@ static esp_err_t commit_values_locked(const settings_values_t *values)
             store.persisted_values = *values;
         }
     }
-    store.status.dirty = !store.status.loaded_from_eeprom ||
+    store.status.dirty = store.commit_uncertain || !store.status.loaded_from_eeprom ||
         memcmp(&store.values, &store.persisted_values, sizeof(store.values)) != 0;
     store.status.storage_error = result;
     return result;
@@ -249,6 +253,33 @@ esp_err_t settings_consume_film(void)
     xSemaphoreTake(store.mutex, portMAX_DELAY);
     if (store.values.film_remaining > 0) --store.values.film_remaining;
     const esp_err_t result = commit_film_locked();
+    xSemaphoreGive(store.mutex);
+    return result;
+}
+
+esp_err_t settings_load_focus(bool *valid, int32_t *raw)
+{
+    if (!valid || !raw) return ESP_ERR_INVALID_ARG;
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    const uint32_t bits = (uint32_t)store.persisted_values.focus_raw;
+    *raw = bits <= INT32_MAX ? (int32_t)bits : (int32_t)((int64_t)bits - 0x100000000LL);
+    *valid = store.status.writable && store.status.loaded_from_eeprom &&
+             store.persisted_values.focus_valid == 1;
+    xSemaphoreGive(store.mutex);
+    return ESP_OK;
+}
+
+esp_err_t settings_save_focus(bool valid, int32_t raw)
+{
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    store.values.focus_raw = (uint32_t)raw;
+    store.values.focus_valid = valid ? 1 : 0;
+    settings_values_t values = store.persisted_values;
+    values.focus_raw = store.values.focus_raw;
+    values.focus_valid = store.values.focus_valid;
+    const esp_err_t result = commit_values_locked(&values);
     xSemaphoreGive(store.mutex);
     return result;
 }

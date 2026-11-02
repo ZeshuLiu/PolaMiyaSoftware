@@ -1,11 +1,32 @@
 #include "display.h"
+#include "lvgl_psram_pool.h"
 
 #include "esp_err.h"
+#include "esp_heap_caps.h"
+#include "sdkconfig.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
 #include "esp_timer.h"
 
+#if !CONFIG_LV_USE_BUILTIN_MALLOC || CONFIG_LV_MEM_ADR != 0
+#error "The PSRAM pool hook requires LVGL builtin malloc and LV_MEM_ADR=0"
+#endif
+
 static const char *TAG = "display";
+
+void *pm_lvgl_psram_pool_alloc(size_t size)
+{
+    /* LVGL calls once during lv_init, before creating any widgets. Never fall
+     * back to internal RAM: doing so would hide failure to free internal RAM. */
+    void *pool = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    ESP_ERROR_CHECK(pool ? ESP_OK : ESP_ERR_NO_MEM);
+    ESP_LOGI(TAG, "LVGL pool: %u bytes in PSRAM; internal free=%u largest=%u",
+             (unsigned)size,
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    return pool;
+}
+
 static int64_t render_started_us;
 static int64_t last_slow_report_us;
 

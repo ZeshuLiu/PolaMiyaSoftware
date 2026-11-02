@@ -52,7 +52,7 @@ void FocusMotor_HomeBoot(void)
         s_status.error_counts = s_retained_fault.error_counts;
     }
     if (s_status.work_state != FOCUS_MOTOR_WORK_ERROR) {
-        s_status.work_state = FOCUS_MOTOR_WORK_NORMAL;
+        s_status.work_state = FOCUS_MOTOR_WORK_INITIALIZING;
     }
     /* 避免旧 POR 标志使下一次软件/外部复位误判为重新上电。 */
     __HAL_RCC_CLEAR_RESET_FLAGS();
@@ -64,6 +64,15 @@ void FocusMotor_HomeStart(FocusMotor_Direction direction)
     s_status = (FocusMotor_HomeStatus){0};
     s_home_direction = direction;
     s_phase = HOME_GLIDE;
+}
+
+/* 由 Motor 确认停止且未寻零后调用；外部 RAW 直接建立有效位置基准。 */
+void FocusMotor_HomeSetCurrentRaw(int32_t current_raw)
+{
+    FocusEncoder_SetPosition(current_raw);
+    s_status = (FocusMotor_HomeStatus){0};
+    s_status.zero_valid = 1U;
+    s_status.work_state = FOCUS_MOTOR_WORK_NORMAL;
 }
 
 /* 先保存诊断信息，再写有效标记；复位后仍能上报错误和最后一次触底位置。 */

@@ -1,5 +1,7 @@
 # 吐片电机
 
+2026-11-02：修正启动 `ledc: GPIO 1 is not usable, maybe conflict with others`。旧初始化先用 `gpio_config()` 预留 IN1 输出，随后 LEDC 再次预留同一路径，触发 ESP-IDF 6.1 的占用警告。现在 IN1 通过公开 GPIO 电平、方向及上下拉接口预置高电平，输出路径仅由 LEDC 绑定时登记；IN2 仍用 `gpio_config()` 作为普通输出。保持先预置两路高电平、再连接反相零驱动 PWM 的顺序，Timer 1 / Channel 1、频率及斜坡不变；未使用私有释放接口或屏蔽警告。仅源码静态核对，未编译、测试或烧录，启动波形实机未验证。
+
 U5 为 DRV8251A，接线取自 `main/PIN.h`：GPIO1 → IN1，GPIO2 → IN2。
 
 - `film_motor_init()` 在屏幕初始化前调用，初始化到 IN1=IN2=1 制动状态；错误由启动入口处理。
