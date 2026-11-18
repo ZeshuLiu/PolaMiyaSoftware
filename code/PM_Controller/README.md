@@ -1,4 +1,34 @@
+2026-11-04：Wi-Fi 用户开关加入 EEPROM（ID 13），开机恢复上次状态；旧记录默认关闭，BLE 仍只在主动配网时开启。成功配网也保存 Wi-Fi 开启。每份轮换记录最多容纳 17 个参数，当前 13 个，剩余 4 个同格式字段。未编译、测试或烧录，实机未验证。
+
+2026-11-04：HOME 长按下键 KEY1 对焦到当前标定 INF，受理后退出手动编辑；无需测距，仍遵守位置初始化和掉电保护。未编译、测试或烧录，实机未验证。
+
+中断槽的已用、空闲及保留状态见 [中断分配记录](中断分配记录.md)；该表是 BLE 启动前的历史快照。
+
+2026-11-04 网络重构：Wi-Fi 启停、已保存网络连接 / 重试和 HTTP 服务由同一工作任务串行处理；配网任务保留并通过队列请求 Wi-Fi。移除临时请求包装与周期性配网诊断，保留关键中断处理。未编译、测试或烧录，故障修复及实机行为待验证。
+
+2026-11-04 Wi-Fi 启动断言：JTAG 显示系统事件任务处理 STA_START 后释放互斥锁时锁字段异常，紧邻任务栈的空间余量很低；原因尚需实机确认。网络配置读取及连接 / 重试已移到独立任务，增加栈余量日志，未编译、测试或烧录。详见 [诊断说明](main/app/diagnostics/README.md)。
+
+2026-11-04：HOME 增加 Wi-Fi 与蓝牙状态图标，分别显示关闭、开启未连接和已连接状态；蓝牙仅表示配网及 BLE 连接，不代表握手已完成。未编译、测试或烧录，实屏未验证。
+
+2026-11-04：对焦五项标定参数存入 EEPROM，SETTINGS / WEB CONFIG 进入后显示 IP 与随机高位端口（49152–65535） 并开启无认证网页，退出关闭；网页保存整组校准，不自动移动镜头。BLE 配网前在 CPU1 预初始化 AES-GCM，尝试把 AES 中断分配至 CPU1。以上均未编译、测试或烧录，实机未验证。
+
+2026-11-04 配网卡死定位：JTAG 显示 NimBLE 主机任务解析握手时越过 4096 字节栈并损坏相邻堆数据；用户单次授权将本机该任务栈设为 10240 字节。未重新配置、编译或烧录，配网和剩余栈待实机验证。详见 [配网说明](main/app/wifi_control/PROVISIONING.md)。
+
+2026-11-04 配网日志补充：BLE 连接后 NimBLE 最小栈余量 1248 字节，最后记录未显示 Security 2 公钥计算；新增请求入口 / 返回诊断以缩小卡死位置，不输出负载。未编译或实机验证。
+
+2026-11-04 配网卡死排查：实机 BLE 连接和 MTU 256 协商成功，之后整机无响应，尚无握手或 panic 证据。新增配网期 NimBLE 栈和内存诊断；相纸任务因历史最小栈余量仅 300 字节而增栈，二者的因果关系未确认。未编译、测试或烧录。
+
+2026-11-04 吐片页面：接入上方出片、底部计时方案，中部电流圆环与刻度同步下移，相纸向上移出并淡出；资源已重新生成。未编译、测试或烧录，实屏未验证。详见 [UI 说明](main/app/ui/README.md)。
+
+2026-11-04 相纸处理：换盒检测后显示 A 表示黑卡待吐；吐片时长严格超过 2 s 后变为 8，之后按同一阈值扣减。吐片及停止斜坡期间屏蔽快门和相纸检测，结束时清除锁存；设置页 FILM 可选择 0–8 或 A 并自动保存相纸字段。未编译、测试或烧录，实机未验证。详见 [相纸处理](main/app/film_reload/README.md)。
+
+2026-11-10：设置菜单新增 BLE REMOTE，用手机小程序读取实测距离和实际对焦距离，手动设置对焦距离或无穷远。通过相机屏幕 PIN 配对后可发送命令，与 PAIR WIFI 互斥。固件未编译、烧录或实机验证。详见 [BLE 遥测与对焦](main/app/ble_remote/README.md)。
+
+BLE REMOTE 开关存入 EEPROM（ID 14），旧记录默认关闭，原 Wi-Fi ID 13 保持独立。开机恢复后保持广播供小程序重连。本机已启用 `CONFIG_BT_NIMBLE_NVS_PERSIST=y`，绑定密钥由 NimBLE 保存到 NVS。配对失败由后台断开并恢复广播，卡死根因及改动效果待串口日志和实机验证。
+
 # PM_Controller 固件
+
+网络设置集中在 SETTINGS → NETWORK，包含 WIFI、BLE REMOTE、PAIR WIFI 和 WEB CONFIG。操作见 [设置菜单](main/app/ui/MENU.md)。菜单改动未编译、烧录或实屏验证。
 
 2026-11-02 PWM 启动占用警告：GPIO1 电机 IN1 和 GPIO9 背光改为公开 GPIO 接口预置安全高电平，由各自 LEDC 通道统一登记输出占用，消除 `gpio_config()` 与 LEDC 重复申领引起的警告。GPIO2 仍为普通高电平输出；电机制动、背光关闭的启动顺序及原 PWM 参数保留。仅源码静态核对，未编译、测试或烧录，波形实机未验证。见 [吐片电机](main/drivers/film_motor/README.md) 和 [背光](main/drivers/st7789/README.md)。
 
@@ -16,6 +46,10 @@
 
 2026-11-02 构建修复：针对 ESP-IDF 6.1.0、NimBLE 动态模式且 CoC / EATT 均为零时的 `ble_l2cap_coc_deinit` 缺失，提供受配置限制的空函数兼容定义；待重新编译验证。
 
+2026-11-03 配网断线排查：HTTP 服务启停移出默认事件循环，BLE 成功后的停止由配网后台任务在 30 秒结果读取窗口后执行；未成功的清理仍由配网任务处理。针对同步等待风险，既有卡死根因仍未确认；未编译或上板。
+
+2026-11-03 配网兼容：Security 2 用户名改为乐鑫 Android App 默认的 `wifiprov`；手机断开原因仍待实机确认。未编译、测试或烧录。
+
 2026-11-02 配网失败：用户反馈手机输入 PIN 后提示设备断开。增加 BLE 连接 / 断开原因、Security 2 握手及清理阶段日志；Wi-Fi 凭据失败后暂保留 BLE 供手机读取。启动 BLE 前对控制器核心进行 RWBLE 中断可用性预检（非预留，不能排除竞争）。根因尚未确认，未编译或上板。
 
 2026-11-02 BLE 中断：用户日志显示 CPU0 RWBLE 三级 IRAM 中断无可用输入并触发看门狗。FocusUnit UART2 初始化改由 CPU1 固定任务执行，BLE 启动前打印双核中断分配表；是否释放出三级中断及串口可靠性待实机验证。未重新编译或烧录。
@@ -30,7 +64,7 @@
 
 2026-11-02 Wi-Fi 卡死排查：WIFI 开关的初始化 / 启停移至独立后台任务，配网启动不再在 UI 任务初始化 Wi-Fi；增加菜单确认、任务创建、启动阶段及内部堆日志。根因仍待串口和实机确认；未重新编译或烧录。
 
-2026-11-02 Wi-Fi：SETTINGS 可启停客户端并主动开启蓝牙配网，Security 2 验证码显示在配网项；成功连接后保存最多三组 NVS 网络，连接后启动局域网状态网页。首次使用、手机 App 兼容、存储和 Web 均未编译、测试或烧录，实机未验证；详细限制见 [Wi-Fi](main/app/wifi_control/PROVISIONING.md)。
+2026-11-02 Wi-Fi：SETTINGS 可启停客户端并主动开启蓝牙配网，Security 2 验证码显示在配网项；成功连接后保存最多三组 NVS 网络，进入 WEB CONFIG 后启动局域网标定网页。首次使用、手机 App 兼容、存储和 Web 均未编译、测试或烧录，实机未验证；详细限制见 [Wi-Fi](main/app/wifi_control/PROVISIONING.md)。
 
 2026-11-02 对焦显示修正：无穷远目标 RAW 1016 附近 ±50 RAW 按 INF 显示，避免反算渐近线产生数百米；RAW 0 等超出标定范围的位置显示 `--`，不因此驱动电机。未编译、测试或烧录，实机未验证。
 
@@ -46,13 +80,13 @@
 
 2026-10-20 充电显示：新增 USB GPIO21 读取和 CHG/STB 组合状态；HC165 的 5 ms 扫描保留 CHG 脉冲历史，UI 持续观察并做稳定判断。HOME / EJECT 共用普通电量、充电动画、充满对勾、无电池斜杠与待确认问号；充满对勾按预览上移 1 px。INFO 显示对应状态。双高不直接判定无电池，重复脉冲满足条件才显示无电池；整板负载下的实际特征待实测。不新增任务、定时器或整屏图片，未编译、测试或烧录。见 [充电状态](main/app/charge_status/README.md)。
 
-2026-10-20 相纸余量：新增 EEPROM 参数 ID 5（0–8），开机读取保存值，旧记录缺项默认 6。FILM_KEY 延时恢复成功后设为 8 并保存；每次吐片从首次启动到最终停止斜坡目标结束严格超过 5 s 时扣 1 张，最低 0，完成后写 EEPROM。中途反向切换仍视为同一次动作。相纸自动保存只提交此字段，不保存尚未确认的背光修改；失败由低优先级任务每秒重试当前值，不重复扣减。保留记录格式、CRC 和轮换机制，未编译、测试或烧录，实机未验证。
+2026-10-20 相纸余量：新增 EEPROM 参数 ID 5（0–8），开机读取保存值，旧记录缺项默认 6。FILM_KEY 延时恢复成功后设为 A（黑卡待吐）并保存；每次吐片从首次启动到最终停止斜坡目标结束严格超过 2 s 时从 A 变 8 或扣 1 张，最低 0，完成后写 EEPROM。中途反向切换仍视为同一次动作。相纸自动保存只提交此字段，不保存尚未确认的背光修改；失败由低优先级任务每秒重试当前值，不重复扣减。保留记录格式、CRC 和轮换机制，未编译、测试或烧录，实机未验证。
 
-FILM_KEY：优先级 1 的低优先级任务每秒读取 GPIO6，发现事件后等待约 1 s；GPIO7 发出至少 100 ms 高脉冲恢复锁存，读回成功后将剩余相纸设为 8。初始化不清除旧事件；失败记录日志，余量不变，并继续轮询重试。任务通过参数服务更新并保存相纸数量，UI 线程负责显示；不控制吐片电机。GPIO 驱动及应用分别见 [film_latch](main/drivers/film_latch/README.md) / [film_reload](main/app/film_reload/README.md)。未编译、测试或烧录，实机未验证。
+FILM_KEY：优先级 1 的低优先级任务每秒读取 GPIO6，发现事件后等待约 1 s；GPIO7 发出至少 100 ms 高脉冲恢复锁存，读回成功后将相纸状态设为 A（黑卡待吐）。初始化不清除旧事件；失败记录日志，余量不变，并继续轮询重试。任务通过参数服务更新并保存相纸数量，UI 线程负责显示；不控制吐片电机。GPIO 驱动及应用分别见 [film_latch](main/drivers/film_latch/README.md) / [film_reload](main/app/film_reload/README.md)。未编译、测试或烧录，实机未验证。
 
 统计：重启计数由 `app_main()` 在参数加载成功后加 1 并提交一次。快门首次下降沿立即触发并计数，随后 1 s 内抑制；主任务约每秒更新计数并单独保存，失败时重试。`settings_init()` 保持只读，EEPROM 布局不变。INFO 电机累计工作时长按整秒加 `s` 显示，存储仍为毫秒；电机时长的业务累计尚未接入。未编译、测试或烧录，实机未验证。
 
-2026-10-20：EJECT 已改为独立页面，启动成功后隐藏 HOME，显示绿色主体、黑色顶栏、本次吐片计时和实时电流圆环。小于 1 A 显示 `.xxx`，底部为放大的循环吐片动画，无 EJECTING / PRESS TO STOP。2026-10-25 已取消页面渐变：启动成功直接进入，停止成功直接返回 HOME；电机仍保留 1 s 启停斜坡，相纸在停止斜坡目标结束后结算；上下键不操作。只刷新当前页，沿用 50 ms UI 周期，无新任务、GIF 或整屏位图；SDK 配置和电机驱动未改动。源码、资源及设计预览已更新，未编译、测试或烧录，实屏未验证。详见 [UI 说明](main/app/ui/README.md)。
+2026-10-20：EJECT 已改为独立页面，启动成功后隐藏 HOME，显示绿色主体、黑色顶栏、本次吐片计时和实时电流圆环。小于 1 A 显示 `.xxx`，上方为循环吐片动画，底部显示计时，无 EJECTING / PRESS TO STOP。2026-10-25 已取消页面渐变：启动成功直接进入，停止成功直接返回 HOME；电机仍保留 1 s 启停斜坡，相纸在停止斜坡目标结束后结算；上下键不操作。只刷新当前页，沿用 50 ms UI 周期，无新任务、GIF 或整屏位图；SDK 配置和电机驱动未改动。源码、资源及设计预览已更新，未编译、测试或烧录，实屏未验证。详见 [UI 说明](main/app/ui/README.md)。
 
 2026-10-19 全量保存工作区：同步 HOME 上下双距离布局、移除时域曲线、字形与图标资源、设计源及预览；一并收录已有 `sdkconfig.defaults` 的 Montserrat 8/10/12 字号开关，不改动本机 `sdkconfig`。本轮未代为编译、测试或烧录，当前布局实屏效果仍待确认。
 
@@ -99,13 +133,14 @@ FILM_KEY：优先级 1 的低优先级任务每秒读取 GPIO6，发现事件后
 | [main/drivers/adc_measure/](main/drivers/adc_measure/README.md) | ADC1 最低速连续 DMA、两路校准与滤波快照 |
 | [main/app/shutter/](main/app/shutter/) | GPIO42 快门下降沿 ISR 直接触发闪光 |
 | [main/drivers/film_latch/](main/drivers/film_latch/README.md) | FILM_KEY 锁存输入、恢复脉冲及读回确认 |
-| [main/app/film_reload/](main/app/film_reload/README.md) | 优先级 1、约 1 s 后恢复锁存并把相纸余量设为 8 |
+| [main/app/film_reload/](main/app/film_reload/README.md) | 优先级 1、约 1 s 后恢复锁存并将相纸状态设为 A（黑卡待吐） |
 | [main/app/settings/](main/app/settings/README.md) | 参数定义、RAM 缓存、CRC、轮换保存与旧版导入 |
 | [main/app/display/](main/app/display/) | 官方 esp_lvgl_port 初始化和显示配置 |
 | [main/app/boot_screen/](main/app/boot_screen/) | 狗图、逐行启动状态和出厂 MAC；完成后交给原 UI |
 | [main/app/ui/](main/app/ui/README.md) | CASE 7 竖屏 UI、测距曲线、KEY1–3 菜单及背光设置 |
 | [main/drivers/focus_unit/](main/drivers/focus_unit/README.md) | FocusUnit UART2 状态、MoveRaw、SetCurrentRaw、寻零和 Stop |
 | [main/app/focus_position/](main/app/focus_position/README.md) | EEPROM 位置恢复、运动前失效、完成保存与初始化状态 |
+| [main/app/ble_remote/](main/app/ble_remote/README.md) | BLE 遥测、手机手动对焦和命令回执 |
 | [main/app/focus_distance/](main/app/focus_distance/README.md) | 标定物距、手动档位、自动对焦目标与状态显示 |
 | [main/app/power_monitor/](main/app/power_monitor/README.md) | 电池电压、单节锂电池电量估算和 IPROPI 电流换算 |
 | [main/drivers/usb_power/](main/drivers/usb_power/README.md) | GPIO21 / TPS3808 有效外电检测 |

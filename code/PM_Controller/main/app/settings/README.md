@@ -26,21 +26,27 @@
 | 2 | `SETTINGS_SHUTTER_COUNT` | `shutter_count` | 0 | uint64，次数 |
 | 3 | `SETTINGS_MOTOR_RUN_MS` | `motor_run_ms` | 0 | uint64，毫秒 |
 | 4 | `SETTINGS_BACKLIGHT_PERCENT` | `backlight_percent` | 100 | 0–100，百分比 |
-| 5 | `SETTINGS_FILM_REMAINING` | `film_remaining` | 6 | 0–8，张 |
+| 5 | `SETTINGS_FILM_REMAINING` | `film_remaining` | 6 | 0–8 张；9 表示黑卡待吐 |
 | 6 | `SETTINGS_FOCUS_RAW` | `focus_raw` | 0 | uint32 二进制补码，解码为 int32 RAW |
 | 7 | `SETTINGS_FOCUS_VALID` | `focus_valid` | 0 | 0 无效 / 1 有效 |
+| 8–10 | `SETTINGS_CAL_OFFSET/A/B` | `cal_offset/cal_a/cal_b` | 标定宏 | IEEE-754 binary64 位模式，记录按小端编码 |
+| 11–12 | `SETTINGS_CAL_MIN_MM/INF_TOL` | `cal_min_mm/cal_inf_tol` | 1000 / 50 | 最小距离 mm / 无穷远显示容差 RAW |
+| 13 | `SETTINGS_WIFI_ENABLED` | `wifi_enabled` | 0 | Wi-Fi 用户开关，0 关闭 / 1 开启 |
+| 14 | `SETTINGS_BLE_REMOTE_ENABLED` | `ble_remote_enabled` | 0 | BLE REMOTE 用户开关，0 关闭 / 1 开启 |
 
-计数和参数均使用无符号 64 位 RAM 字段及持久化值。背光百分比已用于 PWM，设置页修改即时应用，长按 KEY2 显式保存；校准字段尚未定义。
+计数和参数均使用无符号 64 位 RAM 字段及持久化值。背光百分比已用于 PWM，设置页修改即时应用，长按 KEY2 显式保存；对焦标定字段以整组读写。
 
 2026-11-02 对焦位置：`settings_load_focus()` 读取已持久化 RAW / 有效标记；旧记录缺少任一项均视为无效。`settings_save_focus()` 在同一参数锁中成对更新并仅保存对焦字段。运动前先提交有效标记 0，确认成功才允许运动；REACHED 后取消纠偏并确认 STOP / 实际 RAW 稳定后提交有效标记 1，详见 [对焦位置恢复](../focus_position/README.md)。自动保存不带上尚未确认的背光修改。
 
 快门 GPIO 首次下降沿立即触发并计数，随后 1 s 内的下降沿被忽略；通过抑制的事件即使被闪光输出忙状态拒绝也计数。中断只累计待处理次数；主任务约每秒合并到 RAM 并调用 `settings_commit_shutter()` 保存。该接口只合并快门计数，未确认的背光等修改不会随之保存。保存失败保留 RAM 值并重试，不重复递增；断电前未完成保存的计数可能丢失。
 
-2026-10-20 相纸余量持久化：新增稳定 ID 5，复用当前记录版本、CRC 和 31 条轮换记录。旧记录缺少此字段时取默认 6，保留升级前的初始值；有记录后开机读取实际保存的余量，不再使用 UI 占位变量。范围 0–8，FILM_KEY 延时恢复成功后设为 8 并保存；一次吐片从首次成功启动到最终停止斜坡目标结束严格超过 5 s 才减 1，最低为 0，完成时保存。停止斜坡中再次启动仍算同一次动作。
+2026-10-20 相纸余量持久化：新增稳定 ID 5，复用当前记录版本、CRC 和 31 条轮换记录。旧记录缺少此字段时取默认 6，保留升级前的初始值；有记录后开机读取实际保存的余量，不再使用 UI 占位变量。范围 0–8 及黑卡状态 9（显示 A），FILM_KEY 延时恢复成功后设为 9 并保存；一次吐片从首次成功启动到最终停止斜坡目标结束严格超过 2 s 才减 1，最低为 0，完成时保存。停止斜坡中再次启动仍算同一次动作。
 
 `settings_commit_film()` 只将当前相纸余量合并到最后保存的参数快照，复用原三阶段保存流程；其它尚未保存的 RAM 参数保留 dirty，不随相纸自动保存。`settings_consume_film()` 在参数锁内完成饱和减 1 和相纸保存，避免与换片复位竞争。写入失败保留 RAM 值，后台任务每秒调用相纸保存接口重试，不重复扣减或复位；余量未改变时不重复写 EEPROM。UI 调用保存时不持有 LVGL 锁。
 
-新增参数时，在 `settings.h` 增加不重复的稳定 ID 和 RAM 字段，在 `settings_record.c` 的 `parameters[]` 增加字段、默认值、最大值和是否为计数器。编码、校验、赋值和默认值都复用这张表，无需维护 EEPROM 字节偏移。当前记录可容纳最多 17 个 8 字节参数，超过限制会触发编译检查。
+新增参数时，在 `settings.h` 增加不重复的稳定 ID 和 RAM 字段，在 `settings_record.c` 的 `parameters[]` 增加字段、默认值、最大值和是否为计数器。编码、校验、赋值和默认值都复用这张表，无需维护 EEPROM 字节偏移。当前记录可容纳最多 17 个 8 字节参数，现用 14 个，剩余 40 字节，可再放 3 个此格式字段（每项占 12 字节）并余 4 字节。超过限制会触发编译检查。
+
+Wi-Fi 和 BLE REMOTE 分别保存用户开关。旧记录保留原 Wi-Fi 值，缺少 ID 14 时 BLE 默认关闭。BLE 的手机绑定密钥由 NimBLE 保存到 NVS，连接和配对过程状态只在运行时维护。
 
 已有 ID 和单位不改、不复用。兼容新增字段时保留记录版本，旧记录缺少的字段采用默认值；固件遇到未知字段或未知记录版本时返回 `ESP_ERR_NOT_SUPPORTED` 并禁止提交，避免降级丢失新参数。停用字段应保留解析项；改变含义、单位或编码类型时增加新 ID 或明确迁移版本。
 
@@ -74,6 +80,7 @@ CRC32 使用标准 IEEE 多项式，覆盖头部前 12 字节和有效载荷。�
 | `settings_set(key, value)` | 校验并更新一个 RAM 参数 |
 | `settings_increment(key, amount)` | 原子累计统计量；背光等非计数参数不能使用 |
 | `settings_commit()` | 有变化时同步提交；成功后清除 dirty |
+| `settings_save_ble_remote_enabled(enabled)` | 只保存 BLE REMOTE 用户开关。失败时保留待保存 RAM 值 |
 | `settings_commit_film()` | 只保存相纸余量，其它未保存的 RAM 参数保留 |
 | `settings_consume_film()` | 参数锁内扣 1 张（最低 0）并保存；写失败只重试保存接口 |
 | `settings_load_focus(&valid, &raw)` | 读取已持久化的对焦位置；加载失败或缺字段为无效 |
@@ -107,3 +114,9 @@ result = settings_get(&values);
 2026-10-07：按用户要求移除本地主机测试、桩和缓存；以上保留为清理前的验证记录。
 
 2026-10-15 后续确认：用户确认当前固件编译通过，尚未上板验证；本轮未运行测试。
+
+设置页 FILM 可手动选择 0–8 或 A；确认后相纸字段由后台自动保存，不等待长按保存。吐片期间快门与相纸检测屏蔽。未编译、测试或烧录。
+
+2026-11-04：标定字段缺失或组不完整 / 模型无效时整组回退到宏默认值，下一次参数提交写入升级后的记录；不改变已存有效参数。网页保存先验证并仅合并五项标定字段，EEPROM 成功后才原子发布 RAM 值；失败时 RAM 保持原值，最终提交状态不确定时沿用既有重试语义。新增 ID 可能使旧固件禁止写入含新字段的记录。未编译、测试或烧录。
+
+2026-11-04：Wi-Fi 用户开关使用稳定 ID 13，旧记录缺项及无记录默认关闭；设置页切换成功后仅保存此字段，成功配网后保存开启。失败时 Wi-Fi 实际状态不回滚，RAM 值保留为未保存并报告错误；长按 KEY2 可重试统一保存。重启根据保存值异步恢复 Wi-Fi，不自动开启 BLE。未编译、测试或烧录，实机未验证。
