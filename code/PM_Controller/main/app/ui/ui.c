@@ -9,6 +9,8 @@
 #include "power_monitor.h"
 #include "charge_status.h"
 #include "film_motor.h"
+#include "film_reload.h"
+#include "shutter.h"
 #include "focus_unit.h"
 #include "focus_position.h"
 #include "focus_calibration.h"
@@ -21,7 +23,7 @@
 #include "freertos/task.h"
 
 #define FOCUS_BLINK_HALF_US 312500LL
-#define FILM_CONSUME_AFTER_US 5000000LL
+#define FILM_CONSUME_AFTER_US 2000000LL
 
 static const char *TAG = "ui";
 
@@ -105,10 +107,19 @@ static void handle_keys(hc165_key_events_t keys)
                     break;
                 case UI_HOME_FUNC_EJECT: {
                     const bool running = !ui.motor_running;
-                    const esp_err_t result = film_motor_set_running(running);
+                    const bool new_eject = running && !ui.eject_pending;
+                    esp_err_t result = ESP_OK;
+                    if (new_eject) {
+                        shutter_set_blocked(true);
+                        result = film_reload_begin_eject();
+                    }
+                    if (result == ESP_OK) result = film_motor_set_running(running);
+                    if (result != ESP_OK && new_eject) {
+                        film_reload_end_eject();
+                        shutter_set_blocked(false);
+                    }
                     if (result == ESP_OK) {
                         ui.motor_running = running;
-                        const bool new_eject = !ui.eject_pending;
                         ui.eject_pending = true;
                         ui.page = running ? UI_EJECT : UI_HOME;
                         ui.motor_ramp_started_us = esp_timer_get_time();
@@ -205,8 +216,10 @@ static void ui_task(void *argument)
         if (ui.eject_pending && !ui.motor_running &&
             now - ui.motor_ramp_started_us >= (int64_t)FILM_MOTOR_RAMP_MS * 1000) {
             ui.eject_pending = false;
+            film_reload_end_eject();
+            shutter_set_blocked(false);
             /* The first start through the final stop ramp is one eject. UI
-             * scheduling latency must not turn exactly 5 s into a consumed sheet. */
+             * scheduling latency must not turn exactly 2 s into a consumed sheet. */
             const int64_t completed_us = ui.motor_ramp_started_us +
                                          (int64_t)FILM_MOTOR_RAMP_MS * 1000;
             const bool consumed = completed_us - ui.eject_started_us > FILM_CONSUME_AFTER_US;
@@ -215,7 +228,7 @@ static void ui_task(void *argument)
                 ESP_LOGW(TAG, "Film remaining save failed: %s; background save will retry",
                          esp_err_to_name(result));
             }
-            ESP_LOGI(TAG, "Eject complete: duration=%lld ms, over_5s=%d",
+            ESP_LOGI(TAG, "Eject complete: duration=%lld ms, over_2s=%d",
                      (long long)((completed_us - ui.eject_started_us) / 1000), consumed);
         }
         /* Do not replay missed UI ticks after a slow render or EEPROM write. */

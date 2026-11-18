@@ -13,6 +13,7 @@ static portMUX_TYPE count_lock = portMUX_INITIALIZER_UNLOCKED;
 static uint64_t pending_edges;
 static int64_t last_trigger_us;
 static bool triggered;
+static bool blocked;
 
 static const char *TAG = "shutter";
 
@@ -21,7 +22,7 @@ static void shutter_edge(void *context)
     (void)context;
     const int64_t now = esp_timer_get_time();
     portENTER_CRITICAL_ISR(&count_lock);
-    const bool accepted = !triggered || now - last_trigger_us >= SHUTTER_HOLDOFF_US;
+    const bool accepted = !blocked && (!triggered || now - last_trigger_us >= SHUTTER_HOLDOFF_US);
     if (accepted) {
         triggered = true;
         last_trigger_us = now;
@@ -34,6 +35,13 @@ static void shutter_edge(void *context)
     portENTER_CRITICAL_ISR(&count_lock);
     if (pending_edges < UINT64_MAX) ++pending_edges;
     portEXIT_CRITICAL_ISR(&count_lock);
+}
+
+void shutter_set_blocked(bool value)
+{
+    portENTER_CRITICAL(&count_lock);
+    blocked = value;
+    portEXIT_CRITICAL(&count_lock);
 }
 
 uint64_t shutter_take_count(void)

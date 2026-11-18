@@ -1,4 +1,4 @@
-/* Preview only: preserve the current EJECT source and all firmware assets. */
+/* Render preview frames from the current upward EJECT source. */
 const fs = require('fs');
 const path = require('path');
 const {chromium} = require(path.join(process.argv[2], 'playwright'));
@@ -16,35 +16,7 @@ const original = fs.readFileSync(path.join(__dirname, '../../eject.svg'), 'utf8'
             }
             await document.fonts.ready;
         });
-        const template = await page.$eval('svg', root => {
-            root.querySelector('title').textContent='EJECT preview - upward paper, bottom timer';
-            root.querySelector('#eject-paper').setAttribute('transform','rotate(180 21 25)');
-            const label=[...root.querySelectorAll('text')].find(n=>n.textContent==='EJECT TIME');
-            for(const [k,v] of Object.entries({x:'78',y:'267','font-size':'12','font-weight':'700','text-anchor':'middle','letter-spacing':'0'})) label.setAttribute(k,v);
-            for(const n of root.querySelectorAll('text[y="83"]')) n.setAttribute('y','302');
-            const divider=[...root.querySelectorAll('path')].find(n=>n.getAttribute('d')==='M12 98H144');
-            divider.setAttribute('d','M12 248H144');
-            // Give the upper slot a clear gap above the current-gauge ticks.
-            for (const parent of [root.querySelector('[data-eject-static]'),root.querySelector('[data-eject-live]')]) {
-                const gauge=document.createElementNS('http://www.w3.org/2000/svg','g');
-                gauge.setAttribute('transform','translate(0 8)');
-                for(const n of [...parent.children]) {
-                    if(n===label || n===divider || (n.localName==='text' && n.getAttribute('y')==='302'))continue;
-                    gauge.appendChild(n);
-                }
-                parent.appendChild(gauge);
-            }
-            const window=root.querySelector('#eject-paper-window rect');
-            window.setAttribute('y','34');window.setAttribute('height','60');
-            const paper=root.querySelector('g[clip-path="url(#eject-paper-window)"]');
-            paper.id='upward-paper';
-            paper.querySelector('use').setAttribute('transform','translate(57 40)');
-            const slot=root.querySelector('rect[x="43"][y="240"]');
-            slot.setAttribute('y','94');
-            // Paint the slot after the paper; hidden portions stay below its lip.
-            slot.parentNode.insertBefore(paper,slot);
-            return root.outerHTML;
-        });
+        const template = await page.$eval('svg', root => root.outerHTML);
         const frame = (y,opacity=1) => template.replace('translate(57 40)',`translate(57 ${y})`).replace('id="upward-paper"',`id="upward-paper" opacity="${opacity}"`);
         const shots=[['start',82],['middle',65],['out',40]];
         for(const [name,y] of shots) {

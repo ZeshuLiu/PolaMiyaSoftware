@@ -29,7 +29,7 @@ void ui_view_power(const power_sample_t *sample, battery_status_t battery);
 void ui_view_range(const focus_distance_t *focus, const sdm50_sample_t *actual);
 /* Style the target after automatic or manual selection. */
 void ui_view_focus_style(bool editing, bool automatic, bool too_close, bool ready, bool blink_on);
-/* 0..8 remaining instant-film shots. Values above 8 are clamped. */
+/* 0..8 sheets; 9 displays A for the unremoved dark slide. */
 void ui_view_film(unsigned remaining);
 void ui_view_uptime(uint64_t seconds);
 void ui_view_info(const settings_values_t *values, const settings_status_t *status,

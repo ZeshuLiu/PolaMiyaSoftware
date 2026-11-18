@@ -156,7 +156,7 @@ void app_main(void)
     }
     if (range_result != ESP_OK) {
         ESP_LOGW(TAG, "SDM50 initialization/start failed: %s",
-                 esp_err_to_name(range_result));
+                    esp_err_to_name(range_result));
     }
     boot_screen_complete(range_result);
 
@@ -173,7 +173,7 @@ void app_main(void)
     }
     if (storage_result != ESP_OK) {
         ESP_LOGW(TAG, "Parameter storage startup failed: %s",
-                 esp_err_to_name(storage_result));
+                esp_err_to_name(storage_result));
     }
     boot_screen_complete(storage_result);
 
@@ -189,13 +189,13 @@ void app_main(void)
 
     const esp_err_t focus_result = focus_init_with_cpu1_interrupt();
     if (focus_result != ESP_OK) ESP_LOGW(TAG, "FocusUnit UART init failed: %s", esp_err_to_name(focus_result));
-    ESP_LOGI(TAG, "ui_start begin");
-    ui_start(display);
-    ESP_LOGI(TAG, "ui_start done");
     const esp_err_t film_reload_result = film_reload_start();
     if (film_reload_result != ESP_OK) {
         ESP_LOGW(TAG, "Film reload task start failed: %s", esp_err_to_name(film_reload_result));
     }
+    ESP_LOGI(TAG, "ui_start begin");
+    ui_start(display);
+    ESP_LOGI(TAG, "ui_start done");
     ESP_LOGI(TAG, "app_main initialization complete");
     runtime_diagnostics_init();
 

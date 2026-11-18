@@ -499,7 +499,7 @@ void ui_view_focus_style(bool editing, bool automatic, bool too_close, bool read
 void ui_view_film(unsigned remaining)
 {
     if (view.page != UI_HOME) return;
-    if (remaining > FILM_COUNT) remaining = FILM_COUNT;
+    if (remaining > SETTINGS_FILM_DARK_SLIDE) remaining = SETTINGS_FILM_DARK_SLIDE;
     if ((int)remaining == view.film_remaining) return;
 
     for (unsigned i = 0; i < FILM_COUNT; ++i) {
@@ -508,7 +508,8 @@ void ui_view_film(unsigned remaining)
             lv_image_set_src(view.film_frames[i], lit ? ui_film_lit[i] : ui_film_dim[i]);
         }
     }
-    set_text_fmt(view.film_count, "%u", remaining);
+    if (remaining == SETTINGS_FILM_DARK_SLIDE) set_text(view.film_count, "A");
+    else set_text_fmt(view.film_count, "%u", remaining);
     view.film_remaining = (int)remaining;
 }
 

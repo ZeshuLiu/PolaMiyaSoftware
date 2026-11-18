@@ -6,6 +6,7 @@
 #include "esp_err.h"
 #include "focus_calibration.h"
 
+#define SETTINGS_FILM_DARK_SLIDE 9U /* Eight sheets plus the unremoved cover. */
 
 /* Persistent IDs: never renumber or reuse an existing ID for a new meaning. */
 typedef enum {
@@ -56,7 +57,7 @@ esp_err_t settings_commit(void);
 esp_err_t settings_commit_shutter(void);
 /* Persist only film_remaining; leave other uncommitted RAM parameters untouched. */
 esp_err_t settings_commit_film(void);
-/* Saturating one-shot decrement and film-only save under the same parameter lock.
+/* One-shot decrement (dark slide 9 -> 8, otherwise saturating at 0) and film-only save.
  * On a write failure retry commit_film(), never this decrement. */
 esp_err_t settings_consume_film(void);
 /* Atomically update and persist only the focus pair, under the parameter lock.

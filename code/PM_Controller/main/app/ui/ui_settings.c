@@ -25,6 +25,21 @@ static esp_err_t write_backlight(int32_t value)
     return result;
 }
 
+static esp_err_t read_film(int32_t *value)
+{
+    settings_values_t values;
+    const esp_err_t result = settings_get(&values);
+    if (result == ESP_OK) *value = (int32_t)values.film_remaining;
+    return result;
+}
+
+static esp_err_t write_film(int32_t value)
+{
+    return settings_set(SETTINGS_FILM_REMAINING, (uint64_t)value);
+}
+
+static const char *const film_options[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "A"};
+
 static esp_err_t read_wifi(int32_t *value)
 {
     *value = wifi_control_is_enabled() ? 1 : 0;
@@ -66,6 +81,8 @@ static const ui_menu_item_t items[] = {
     {.title = "BACKLIGHT", .type = UI_MENU_NUMBER,
      .number = {.minimum = 0, .maximum = 100, .step = 5, .unit = "%",
                 .read = read_backlight, .write = write_backlight}},
+    {.title = "FILM", .type = UI_MENU_CHOICE,
+     .choice = {.labels = film_options, .count = 10, .read = read_film, .write = write_film}},
     {.title = "WIFI", .type = UI_MENU_SUBMENU,
      .choice = {.labels = wifi_options, .count = 2, .read = read_wifi, .write = write_wifi}},
     {.title = "PAIR WIFI", .type = UI_MENU_ACTION,
@@ -108,7 +125,9 @@ void ui_settings_open(void)
 static void report_result(ui_menu_result_t result)
 {
     if (result == UI_MENU_CHANGED) {
-        notice = menu.items[menu.selected].type == UI_MENU_SUBMENU ? NULL : "UNSAVED";
+        const ui_menu_item_t *item = &menu.items[menu.selected];
+        notice = item->type == UI_MENU_SUBMENU ? NULL :
+                 item->type == UI_MENU_CHOICE && item->choice.write == write_film ? "AUTO SAVE" : "UNSAVED";
         notice_error = false;
     }
     else if (result == UI_MENU_STARTED) { notice = NULL; notice_error = false; }

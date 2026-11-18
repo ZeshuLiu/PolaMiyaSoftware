@@ -17,7 +17,7 @@ static const parameter_t parameters[] = {
     {SETTINGS_SHUTTER_COUNT, offsetof(settings_values_t, shutter_count), 0, UINT64_MAX, true},
     {SETTINGS_MOTOR_RUN_MS, offsetof(settings_values_t, motor_run_ms), 0, UINT64_MAX, true},
     {SETTINGS_BACKLIGHT_PERCENT, offsetof(settings_values_t, backlight_percent), 100, 100, false},
-    {SETTINGS_FILM_REMAINING, offsetof(settings_values_t, film_remaining), 6, 8, false},
+    {SETTINGS_FILM_REMAINING, offsetof(settings_values_t, film_remaining), 6, SETTINGS_FILM_DARK_SLIDE, false},
     {SETTINGS_FOCUS_RAW, offsetof(settings_values_t, focus_raw), 0, UINT32_MAX, false},
     {SETTINGS_FOCUS_VALID, offsetof(settings_values_t, focus_valid), 0, 1, false},
     {SETTINGS_CAL_OFFSET, offsetof(settings_values_t, cal_offset), 0, UINT64_MAX, false},

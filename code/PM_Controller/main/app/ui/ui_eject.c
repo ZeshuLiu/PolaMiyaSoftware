@@ -96,7 +96,7 @@ lv_obj_t *ui_eject_create(lv_obj_t *screen)
     lv_obj_remove_flag(eject.arc, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_state(eject.arc, LV_STATE_FOCUSED);
     /* 121 px outer diameter minus the 7 px stroke gives a 57 px center radius. */
-    lv_obj_set_pos(eject.arc, 18, 105 - EJECT_HEADER_H);
+    lv_obj_set_pos(eject.arc, 18, 113 - EJECT_HEADER_H);
     lv_obj_set_size(eject.arc, 121, 121);
     lv_arc_set_bg_angles(eject.arc, 135, 45);
     lv_arc_set_range(eject.arc, 0, EJECT_FULL_MA);
@@ -111,14 +111,14 @@ lv_obj_t *ui_eject_create(lv_obj_t *screen)
     eject.tip_visible = false;
     eject.arc_ma = -1;
 
-    eject.time = number(54, 36, &ui_font_eject_time);
-    eject.current = number(143, 50, &ui_font_eject_current);
+    eject.time = number(273, 36, &ui_font_eject_time);
+    eject.current = number(151, 50, &ui_font_eject_current);
 
-    fill(eject.body, 43, 240 - EJECT_HEADER_H, 70, 6, EJECT_INK, 3);
-    /* The viewport clips the paper at the slot; the single image moves down. */
-    lv_obj_t *window = box(eject.body, 43, 246 - EJECT_HEADER_H, 70, 67);
-    eject.paper = picture(window, 14, -42, &ui_eject_paper);
-    eject.paper_y = -42;
+    /* Clip the upward-moving paper at the slot; its artwork is rotated in SVG. */
+    lv_obj_t *window = box(eject.body, 43, 34 - EJECT_HEADER_H, 70, 60);
+    eject.paper = picture(window, 14, 60, &ui_eject_paper);
+    eject.paper_y = 60;
+    fill(eject.body, 43, 94 - EJECT_HEADER_H, 70, 6, EJECT_INK, 3);
     eject.paper_opa = LV_OPA_COVER;
     fill(eject.root, 0, 0, 172, EJECT_HEADER_H, 0x080b0c, 0);
     picture(eject.root, 12, 13, &ui_header_brand);
@@ -161,7 +161,7 @@ void ui_eject_update(uint64_t elapsed_ms, const power_sample_t *sample)
                                 ? &ui_font_eject_current : &ui_font_body;
     if (lv_obj_get_style_text_font(eject.current, 0) != font) {
         lv_obj_set_style_text_font(eject.current, font, 0);
-        lv_obj_set_y(eject.current, (font == &ui_font_body ? 164 : 143) - EJECT_HEADER_H);
+        lv_obj_set_y(eject.current, (font == &ui_font_body ? 172 : 151) - EJECT_HEADER_H);
     }
     text(eject.current, value);
     const bool tip_visible = sample->motor_valid && arc_ma > 0;
@@ -173,14 +173,14 @@ void ui_eject_update(uint64_t elapsed_ms, const power_sample_t *sample)
         lv_arc_set_value(eject.arc, arc_ma);
         const float angle = (135.0f + 270.0f * arc_ma / EJECT_FULL_MA) * 0.01745329252f;
         lv_obj_set_pos(eject.tip, (int)lroundf(78 + 57 * cosf(angle)) - 2,
-                       (int)lroundf(165 + 57 * sinf(angle)) - 2 - EJECT_HEADER_H);
+                       (int)lroundf(173 + 57 * sinf(angle)) - 2 - EJECT_HEADER_H);
         eject.arc_ma = arc_ma;
     }
 
     /* 1.872 s travel, hold, then fade before the next paper. This is a running
      * indicator, not a film position sensor or a remaining-shot counter. */
     const unsigned phase = (unsigned)(elapsed_ms % EJECT_CYCLE_MS);
-    const int y = -42 + (phase < 1872 ? (int)(59 * phase / 1872) : 59);
+    const int y = 60 - (phase < 1872 ? (int)(54 * phase / 1872) : 54);
     const lv_opa_t opa = phase < 2132 ? LV_OPA_COVER :
                             (lv_opa_t)(LV_OPA_COVER * (EJECT_CYCLE_MS - phase) / 468);
     if (y != eject.paper_y) {
