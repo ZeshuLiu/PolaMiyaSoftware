@@ -18,7 +18,7 @@ void settings_record_encode(const settings_values_t *values, uint32_t sequence,
                                  uint8_t record[SETTINGS_RECORD_BYTES]);
 /* Sequence is usable on ESP_OK or ESP_ERR_NOT_SUPPORTED. */
 esp_err_t settings_record_decode(const uint8_t record[SETTINGS_RECORD_BYTES],
-                                 settings_values_t *values, uint32_t *sequence);
+                                 settings_values_t *values, uint32_t *sequence, bool *calibration_missing);
 size_t settings_record_body_size(const uint8_t record[SETTINGS_RECORD_BYTES]);
 
 #endif

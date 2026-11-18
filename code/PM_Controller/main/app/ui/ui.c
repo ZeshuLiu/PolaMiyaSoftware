@@ -47,6 +47,22 @@ static void handle_keys(hc165_key_events_t keys)
         if (ui_settings_handle_keys(keys)) ui.page = UI_HOME;
         return;
     }
+    /* HOME long-press on the bottom key retracts to the calibrated infinity
+     * target, regardless of which HOME function is selected. */
+    if (ui.page == UI_HOME && (keys.long_press & HC165_KEY1)) {
+        int32_t target;
+        if (focus_distance_to_raw(0, true, &target)) {
+            const esp_err_t result = focus_position_set_target(target);
+            if (result == ESP_OK) {
+                ui.focus_editing = false;
+                ui.focus_auto = true;
+                ui.focus_too_close = false;
+            } else {
+                ESP_LOGW(TAG, "Infinity focus rejected: %s", esp_err_to_name(result));
+            }
+        }
+        return;
+    }
     if (keys.long_press & HC165_KEY2) {
         if (ui.page == UI_HOME && ui.home_func == UI_HOME_FUNC_FOCUS && !ui.focus_editing) {
             ui.focus_editing = true;
@@ -70,12 +86,14 @@ static void handle_keys(hc165_key_events_t keys)
                     sdm50_sample_t sample;
                     int32_t target;
                     if (sdm50_get_sample(&sample) != ESP_OK) break;
+                    focus_calibration_t cal;
+                    if (focus_calibration_get(&cal) != ESP_OK) break;
                     const bool infinity = sample.status == SDM50_NO_TARGET;
                     const bool too_close = sample.status == SDM50_TOO_CLOSE ||
-                        (sample.status == SDM50_VALID && sample.distance_mm < FOCUS_CALIBRATION_MIN_DISTANCE_MM);
+                        (sample.status == SDM50_VALID && sample.distance_mm < cal.min_distance_mm);
                     if (sample.status != SDM50_VALID && sample.status != SDM50_TOO_CLOSE && !infinity) break;
-                    const uint32_t distance_mm = too_close ? FOCUS_CALIBRATION_MIN_DISTANCE_MM : sample.distance_mm;
-                    if (focus_distance_to_raw(distance_mm, infinity, &target) &&
+                    const uint32_t distance_mm = too_close ? cal.min_distance_mm : sample.distance_mm;
+                    if (focus_distance_to_raw_with_calibration(&cal, distance_mm, infinity, &target) &&
                         focus_position_set_target(target) == ESP_OK) {
                         ui.focus_auto = true;
                         ui.focus_too_close = too_close;

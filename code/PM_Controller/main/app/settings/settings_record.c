@@ -1,6 +1,7 @@
 #include "settings_record.h"
 
 #include <string.h>
+#include <float.h>
 
 typedef struct {
     settings_key_t key;
@@ -19,6 +20,11 @@ static const parameter_t parameters[] = {
     {SETTINGS_FILM_REMAINING, offsetof(settings_values_t, film_remaining), 6, 8, false},
     {SETTINGS_FOCUS_RAW, offsetof(settings_values_t, focus_raw), 0, UINT32_MAX, false},
     {SETTINGS_FOCUS_VALID, offsetof(settings_values_t, focus_valid), 0, 1, false},
+    {SETTINGS_CAL_OFFSET, offsetof(settings_values_t, cal_offset), 0, UINT64_MAX, false},
+    {SETTINGS_CAL_A, offsetof(settings_values_t, cal_a), 0, UINT64_MAX, false},
+    {SETTINGS_CAL_B, offsetof(settings_values_t, cal_b), 0, UINT64_MAX, false},
+    {SETTINGS_CAL_MIN_MM, offsetof(settings_values_t, cal_min_mm), FOCUS_CALIBRATION_MIN_DISTANCE_MM, UINT32_MAX, false},
+    {SETTINGS_CAL_INF_TOL, offsetof(settings_values_t, cal_inf_tol), FOCUS_CALIBRATION_INFINITY_TOLERANCE_RAW, UINT32_MAX, false},
 };
 #define PARAMETER_COUNT (sizeof(parameters) / sizeof(parameters[0]))
 #define ENTRY_BYTES 12U /* ID: u16, length: u16, value: u64; all little-endian. */
@@ -59,12 +65,25 @@ static int find_parameter(settings_key_t key)
     return -1;
 }
 
+static void calibration_defaults(settings_values_t *values)
+{
+    const double offset = FOCUS_CALIBRATION_OFFSET_RAW, a = FOCUS_CALIBRATION_A_RAW_M, b = FOCUS_CALIBRATION_B_M;
+    _Static_assert(sizeof(double) == sizeof(uint64_t) && DBL_MANT_DIG == 53 && DBL_MAX_EXP == 1024,
+                   "Calibration requires IEEE-754 binary64");
+    memcpy(&values->cal_offset, &offset, sizeof(offset));
+    memcpy(&values->cal_a, &a, sizeof(a));
+    memcpy(&values->cal_b, &b, sizeof(b));
+    values->cal_min_mm = FOCUS_CALIBRATION_MIN_DISTANCE_MM;
+    values->cal_inf_tol = FOCUS_CALIBRATION_INFINITY_TOLERANCE_RAW;
+}
+
 void settings_values_default(settings_values_t *values)
 {
     memset(values, 0, sizeof(*values));
     for (size_t i = 0; i < PARAMETER_COUNT; ++i) {
         *field(values, i) = parameters[i].default_value;
     }
+    calibration_defaults(values);
 }
 
 esp_err_t settings_values_set(settings_values_t *values, settings_key_t key, uint64_t value)
@@ -147,7 +166,7 @@ static bool settings_record_valid(const uint8_t record[SETTINGS_RECORD_BYTES], u
 }
 
 esp_err_t settings_record_decode(const uint8_t record[SETTINGS_RECORD_BYTES],
-                                 settings_values_t *values, uint32_t *sequence)
+                                 settings_values_t *values, uint32_t *sequence, bool *calibration_missing)
 {
     if (!settings_record_valid(record, sequence)) {
         return ESP_ERR_INVALID_CRC;
@@ -188,6 +207,17 @@ esp_err_t settings_record_decode(const uint8_t record[SETTINGS_RECORD_BYTES],
      * with neither field remain compatible and require homing. */
     if (!seen[find_parameter(SETTINGS_FOCUS_RAW)] ||
         !seen[find_parameter(SETTINGS_FOCUS_VALID)]) values->focus_valid = 0;
+    bool complete = true;
+    for (int key = SETTINGS_CAL_OFFSET; key <= SETTINGS_CAL_INF_TOL; ++key)
+        complete = complete && seen[find_parameter((settings_key_t)key)];
+    focus_calibration_t cal;
+    memcpy(&cal.offset_raw, &values->cal_offset, sizeof(double));
+    memcpy(&cal.a_raw_m, &values->cal_a, sizeof(double));
+    memcpy(&cal.b_m, &values->cal_b, sizeof(double));
+    cal.min_distance_mm = (uint32_t)values->cal_min_mm;
+    cal.infinity_tolerance_raw = (uint32_t)values->cal_inf_tol;
+    if (!complete || !focus_calibration_valid(&cal)) calibration_defaults(values);
+    if (calibration_missing) *calibration_missing = !complete || !focus_calibration_valid(&cal);
     /* Don't allow old firmware to erase parameters introduced by newer firmware. */
     return unknown_parameter ? ESP_ERR_NOT_SUPPORTED : ESP_OK;
 }

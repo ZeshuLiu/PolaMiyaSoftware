@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "esp_err.h"
+#include "focus_calibration.h"
+
 
 /* Persistent IDs: never renumber or reuse an existing ID for a new meaning. */
 typedef enum {
@@ -14,6 +16,11 @@ typedef enum {
     SETTINGS_FILM_REMAINING = 5,
     SETTINGS_FOCUS_RAW = 6,
     SETTINGS_FOCUS_VALID = 7,
+    SETTINGS_CAL_OFFSET = 8,
+    SETTINGS_CAL_A = 9,
+    SETTINGS_CAL_B = 10,
+    SETTINGS_CAL_MIN_MM = 11,
+    SETTINGS_CAL_INF_TOL = 12,
 } settings_key_t;
 
 typedef struct {
@@ -23,6 +30,8 @@ typedef struct {
     uint64_t backlight_percent;
     uint64_t film_remaining;
     uint64_t focus_raw;       /* int32 RAW encoded as uint32 two's complement. */
+    uint64_t cal_offset, cal_a, cal_b; /* IEEE-754 binary64 bits. */
+    uint64_t cal_min_mm, cal_inf_tol;
     uint64_t focus_valid;     /* 0 before motion; 1 only after confirmed STOP. */
 } settings_values_t;
 
@@ -53,6 +62,9 @@ esp_err_t settings_consume_film(void);
 /* Atomically update and persist only the focus pair, under the parameter lock.
  * Motion is forbidden unless save_focus(false, ...) succeeds. */
 esp_err_t settings_save_focus(bool valid, int32_t raw);
+/* Group save persists first and publishes all five fields only on success. */
+esp_err_t settings_get_calibration(focus_calibration_t *cal);
+esp_err_t settings_save_calibration(const focus_calibration_t *cal);
 /* Read the committed pair, never an uncommitted RAM value. */
 esp_err_t settings_load_focus(bool *valid, int32_t *raw);
 

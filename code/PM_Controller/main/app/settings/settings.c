@@ -16,6 +16,7 @@ static struct {
     settings_status_t status;
     int active_record;
     bool commit_uncertain;
+    bool calibration_migration;
 } store;
 
 static bool sequence_is_newer(uint32_t candidate, uint32_t current)
@@ -38,7 +39,8 @@ static esp_err_t load_records(void)
         }
         uint32_t sequence;
         settings_values_t values;
-        result = settings_record_decode(record, &values, &sequence);
+        bool calibration_missing = false;
+        result = settings_record_decode(record, &values, &sequence, &calibration_missing);
         if (result != ESP_OK && result != ESP_ERR_NOT_SUPPORTED) {
             continue;
         }
@@ -49,6 +51,7 @@ static esp_err_t load_records(void)
             newest_result = result;
             if (result == ESP_OK) {
                 store.values = values;
+                store.calibration_migration = calibration_missing;
             }
         }
     }
@@ -57,7 +60,7 @@ static esp_err_t load_records(void)
         return newest_result;
     }
     store.status.loaded_from_eeprom = found;
-    store.status.dirty = !found;
+    store.status.dirty = !found || store.calibration_migration;
     store.persisted_values = store.values;
     return ESP_OK;
 }
@@ -126,7 +129,7 @@ esp_err_t settings_set(settings_key_t key, uint64_t value)
     xSemaphoreTake(store.mutex, portMAX_DELAY);
     const esp_err_t result = settings_values_set(&store.values, key, value);
     if (result == ESP_OK) {
-        store.status.dirty = store.commit_uncertain || !store.status.loaded_from_eeprom ||
+        store.status.dirty = store.commit_uncertain || store.calibration_migration || !store.status.loaded_from_eeprom ||
             memcmp(&store.values, &store.persisted_values, sizeof(store.values)) != 0;
     }
     xSemaphoreGive(store.mutex);
@@ -141,7 +144,7 @@ esp_err_t settings_increment(settings_key_t key, uint64_t amount)
     xSemaphoreTake(store.mutex, portMAX_DELAY);
     const esp_err_t result = settings_values_increment(&store.values, key, amount);
     if (result == ESP_OK) {
-        store.status.dirty = store.commit_uncertain || !store.status.loaded_from_eeprom ||
+        store.status.dirty = store.commit_uncertain || store.calibration_migration || !store.status.loaded_from_eeprom ||
             memcmp(&store.values, &store.persisted_values, sizeof(store.values)) != 0;
     }
     xSemaphoreGive(store.mutex);
@@ -187,7 +190,7 @@ static esp_err_t write_record(unsigned int index, const uint8_t *record)
 static esp_err_t commit_values_locked(const settings_values_t *values)
 {
     esp_err_t result = store.status.writable ? ESP_OK : store.status.storage_error;
-    if (result == ESP_OK && (store.commit_uncertain || !store.status.loaded_from_eeprom ||
+    if (result == ESP_OK && (store.commit_uncertain || store.calibration_migration || !store.status.loaded_from_eeprom ||
                             memcmp(values, &store.persisted_values, sizeof(*values)) != 0)) {
         uint8_t record[SETTINGS_RECORD_BYTES];
         const unsigned int next = store.active_record < 0 ? 0
@@ -203,9 +206,10 @@ static esp_err_t commit_values_locked(const settings_values_t *values)
             store.status.sequence = sequence;
             store.status.loaded_from_eeprom = true;
             store.persisted_values = *values;
+            store.calibration_migration = false;
         }
     }
-    store.status.dirty = store.commit_uncertain || !store.status.loaded_from_eeprom ||
+    store.status.dirty = store.commit_uncertain || store.calibration_migration || !store.status.loaded_from_eeprom ||
         memcmp(&store.values, &store.persisted_values, sizeof(store.values)) != 0;
     store.status.storage_error = result;
     return result;
@@ -253,6 +257,49 @@ esp_err_t settings_consume_film(void)
     xSemaphoreTake(store.mutex, portMAX_DELAY);
     if (store.values.film_remaining > 0) --store.values.film_remaining;
     const esp_err_t result = commit_film_locked();
+    xSemaphoreGive(store.mutex);
+    return result;
+}
+
+static void calibration_from_values(const settings_values_t *values, focus_calibration_t *cal)
+{
+    memcpy(&cal->offset_raw, &values->cal_offset, sizeof(double));
+    memcpy(&cal->a_raw_m, &values->cal_a, sizeof(double));
+    memcpy(&cal->b_m, &values->cal_b, sizeof(double));
+    cal->min_distance_mm = (uint32_t)values->cal_min_mm;
+    cal->infinity_tolerance_raw = (uint32_t)values->cal_inf_tol;
+}
+
+esp_err_t settings_get_calibration(focus_calibration_t *cal)
+{
+    if (!cal) return ESP_ERR_INVALID_ARG;
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    calibration_from_values(&store.values, cal);
+    xSemaphoreGive(store.mutex);
+    return ESP_OK;
+}
+
+esp_err_t settings_save_calibration(const focus_calibration_t *cal)
+{
+    if (!cal || !focus_calibration_valid(cal)) return ESP_ERR_INVALID_ARG;
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    settings_values_t values = store.persisted_values;
+    memcpy(&values.cal_offset, &cal->offset_raw, sizeof(double));
+    memcpy(&values.cal_a, &cal->a_raw_m, sizeof(double));
+    memcpy(&values.cal_b, &cal->b_m, sizeof(double));
+    values.cal_min_mm = cal->min_distance_mm;
+    values.cal_inf_tol = cal->infinity_tolerance_raw;
+    const esp_err_t result = commit_values_locked(&values);
+    if (result == ESP_OK) {
+        store.values.cal_offset = values.cal_offset;
+        store.values.cal_a = values.cal_a;
+        store.values.cal_b = values.cal_b;
+        store.values.cal_min_mm = values.cal_min_mm;
+        store.values.cal_inf_tol = values.cal_inf_tol;
+        store.status.dirty = memcmp(&store.values, &store.persisted_values, sizeof(store.values)) != 0;
+    }
     xSemaphoreGive(store.mutex);
     return result;
 }
