@@ -1,0 +1,17 @@
+Mcu Type=CH32V205
+Address=0x08000000
+Target Path=obj/ViewFinder.hex
+Erase All=true
+Program=true
+Verify=true
+Reset=true
+
+Vendor=WCH
+Link=WCH-Link
+Toolchain=RISC-V
+Series=CH32V205
+RTOS=NoneOS
+MCU=CH32V205CCT6
+Description=Website: https://www.wch.cn/products/CH32V205.html\nROM(byte): 256K, SRAM(byte): 32K, CHIP PINS: 48, GPIO PORTS: 41.\nCH32V205 is an industrial-grade general-purpose microcontroller designed based on the RISC-V core of Qingke. The CH32V205 is equipped with a built-in USB 2.0 high-speed PHY Transceiver (480Mbps) and PD PHY, supporting PDUSB, including USB Host and USB Device functions, USB PD and The Type-C fast charging function provides programmable protocol I/O controller (PIOC), static memory controller (FSMC), QSPI interface, and CAN connection Port, 8 groups of USART serial ports, 2 groups of I2C, 2 groups of SPI, multiple groups of timers, 2 groups of OPA operational amplifiers, 2 groups of CMP voltage comparators, 4Msps Rich peripheral resources such as high-speed 12-bit ADC and 16-channel Touchkey.
+TempratureScope=CH32V205CCT6{-40℃~85℃}
+PeripheralVersion=1.2
