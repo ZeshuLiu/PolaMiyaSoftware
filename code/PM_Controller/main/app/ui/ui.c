@@ -14,6 +14,9 @@
 #include "focus_unit.h"
 #include "focus_position.h"
 #include "focus_calibration.h"
+#include "wifi_control.h"
+#include "wifi_pair.h"
+#include "ble_remote.h"
 #include <stdint.h>
 #include "esp_err.h"
 #include "esp_log.h"
@@ -36,6 +39,7 @@ static struct {
     bool focus_too_close;
     bool motor_running;
     bool eject_pending;
+    bool restore_ble;
     int64_t motor_started_us;
     int64_t eject_started_us;
     int64_t motor_ramp_started_us;
@@ -174,6 +178,15 @@ static void ui_task(void *argument)
 {
     (void)argument;
     while (1) {
+        if (ui.restore_ble && !wifi_control_busy()) {
+            ui.restore_ble = false;
+            settings_values_t values;
+            if (settings_get(&values) == ESP_OK && values.ble_remote_enabled &&
+                !ble_remote_active()) {
+                const esp_err_t result = ble_remote_start();
+                if (result != ESP_OK) ESP_LOGW(TAG, "BLE restore request failed: %s", esp_err_to_name(result));
+            }
+        }
         handle_keys(hc165_take_events());
         sdm50_sample_t sample = {.status = SDM50_RX_ERROR};
         if (sdm50_get_sample(&sample) != ESP_OK) {
@@ -183,6 +196,15 @@ static void ui_task(void *argument)
         focus_position_process(focus_now_ms);
         const focus_unit_snapshot_t focus_snapshot = focus_position_snapshot(focus_now_ms);
         const focus_distance_t focus = focus_distance_get(&focus_snapshot);
+        uint32_t position_mm = 0;
+        bool position_infinity = false;
+        const bool position_valid = focus.state == FOCUS_DISTANCE_READY &&
+            focus_distance_from_raw(focus_snapshot.position, &position_mm, &position_infinity);
+        if (ble_remote_update(&sample, &focus, position_valid, position_mm, position_infinity,
+                              !ui.focus_editing && !ui.motor_running && !ui.eject_pending)) {
+            ui.focus_auto = false;
+            ui.focus_too_close = false;
+        }
         if (ui.page == UI_SETUP) ui_settings_refresh();
 
         power_sample_t power;
@@ -196,6 +218,10 @@ static void ui_task(void *argument)
         const hc165_inputs_t charge_inputs = hc165_get_inputs();
         const battery_status_t battery = charge_status_update(now_ms, &charge_inputs, &power);
         const bool focus_visible = ((now / FOCUS_BLINK_HALF_US) % 2 == 0);
+        const bool wifi_on = wifi_control_is_enabled();
+        const bool wifi_connected = wifi_control_is_connected();
+        const bool ble_active = wifi_pair_active() || ble_remote_active();
+        const bool ble_connected = wifi_pair_ble_connected() || ble_remote_connected();
 
         ESP_ERROR_CHECK(lvgl_port_lock(0) ? ESP_OK : ESP_ERR_TIMEOUT);
         ui_view_show(ui.page);
@@ -206,10 +232,11 @@ static void ui_task(void *argument)
         ui_view_focus_style(ui.focus_editing, ui.focus_auto, ui.focus_too_close,
                             focus.state == FOCUS_DISTANCE_READY, focus_visible);
         ui_view_power(&power, battery);
+        ui_view_wireless(wifi_on, wifi_connected, ble_active, ble_connected);
         if (settings_available) ui_view_film((unsigned)values.film_remaining);
         ui_view_uptime((uint64_t)(now / 1000000));
         ui_view_info(&values, &status, settings_available);
-        ui_view_focus_info(&focus, &focus_snapshot);
+        ui_view_focus_info(&focus, &focus_snapshot, position_valid, position_mm, position_infinity);
         if (ui.page == UI_SETUP) ui_settings_render();
         lvgl_port_unlock();
         /* Page changes are immediate; settle film usage after the motor stop ramp. */
@@ -258,6 +285,11 @@ void ui_start(lv_display_t *display)
     lv_refr_now(display);
     lvgl_port_unlock();
     lcd_st7789_backlight(true);
+    if (values.wifi_enabled) {
+        const esp_err_t result = wifi_control_request_enabled(true);
+        if (result != ESP_OK) ESP_LOGW(TAG, "Wi-Fi restore request failed: %s", esp_err_to_name(result));
+    }
+    ui.restore_ble = values.ble_remote_enabled != 0;
     ESP_ERROR_CHECK(xTaskCreate(ui_task, "ui", 4096, NULL, 3, NULL) == pdPASS
                     ? ESP_OK : ESP_ERR_NO_MEM);
     ESP_LOGI(TAG, "UI ready: CASE 7, 172x320; HOME list, K3 up/increase, K1 down/decrease, K2 confirm/hold save");

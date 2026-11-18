@@ -26,16 +26,23 @@ typedef struct {
     bool shown_valid;
 } menu_card_t;
 
+typedef struct {
+    lv_obj_t *root;
+    menu_card_t *cards;
+    unsigned selected;
+} menu_list_t;
+
 static struct {
     lv_obj_t *root, *title, *counter, *current, *current_check;
-    lv_obj_t *main_list, *option_list, *footer, *status, *hint;
-    menu_card_t *cards, back;
-    unsigned list_item, cursor, selected;
+    lv_obj_t *option_list, *footer, *status, *hint;
+    menu_list_t settings, network;
+    menu_card_t back;
+    unsigned list_item, cursor;
     int32_t applied;
     bool applied_valid;
     ui_menu_phase_t phase;
     uint32_t footer_color;
-    bool compact;
+    bool compact, network_page;
 } view;
 
 static void show(lv_obj_t *obj, bool visible)
@@ -146,7 +153,7 @@ static void create_card(menu_card_t *card, lv_obj_t *parent, int y, int h,
         }
     } else {
         card->value = label(card->root, 8, h - 31, 104, "", &ui_font_body);
-        if (item->type == UI_MENU_ACTION || item->type == UI_MENU_SUBMENU) {
+        if (item->type == UI_MENU_ACTION || item->type == UI_MENU_SUBMENU || item->type == UI_MENU_PAGE) {
             card->arrow = line(card->root, 98, h / 2 - 7, arrow, 3);
             card->dots = box(card->root, 94, h / 2 - 2, 18, 4, 0);
             for (unsigned i = 0; i < 3; ++i) {
@@ -217,7 +224,10 @@ static void update_card(menu_card_t *card, const ui_menu_item_t *item,
     const bool changed = paint || card->shown_value != display || card->shown_valid != value->valid;
     if (changed && item->type == UI_MENU_NUMBER) number_layout(card, item, display, value->valid);
     else if (item->type == UI_MENU_ACTION)
-        set_text(card->value, value->busy ? "RUNNING" : disabled ? "NOT READY" : "START");
+        set_text(card->value, value->detail ? value->detail :
+                 value->busy ? "RUNNING" : disabled ? "NOT READY" : "START");
+    else if (item->type == UI_MENU_PAGE)
+        set_text(card->value, "OPEN");
     else if (changed && (item->type == UI_MENU_CHOICE || item->type == UI_MENU_SUBMENU)) {
         if (card->segment) {
             show(card->pill, value->valid);
@@ -287,15 +297,32 @@ static void update_options(const ui_menu_t *menu)
     view.applied_valid = value->valid;
 }
 
-lv_obj_t *ui_menu_view_create(lv_obj_t *screen, const ui_menu_t *menu)
+static void create_list(menu_list_t *list, const ui_menu_t *menu)
+{
+    list->cards = calloc(menu->count, sizeof(*list->cards));
+    ESP_ERROR_CHECK(list->cards ? ESP_OK : ESP_ERR_NO_MEM);
+    list->selected = UINT_MAX;
+    list->root = box(view.root, 8, 42, 120, view.compact ? 240 : 202, 0);
+    scrolling(list->root);
+    int y = 0;
+    for (unsigned i = 0; i < menu->count; ++i) {
+        const ui_menu_type_t type = menu->items[i].type;
+        const int h = type == UI_MENU_BACK ? (view.compact ? 36 : 40) :
+                      type == UI_MENU_NUMBER ? (view.compact ? 60 : 68) :
+                      (type == UI_MENU_ACTION || type == UI_MENU_PAGE) && view.compact ? 56 : 64;
+        create_card(&list->cards[i], list->root, y, h, &menu->items[i]);
+        const bool next_is_back = i + 1 < menu->count && menu->items[i + 1].type == UI_MENU_BACK;
+        y += h + (view.compact ? 8 : next_is_back ? 12 : 10);
+    }
+}
+
+lv_obj_t *ui_menu_view_create(lv_obj_t *screen, const ui_menu_t *settings, const ui_menu_t *network)
 {
     static const lv_point_precise_t check[] = {{0,4},{4,8},{11,0}};
-    view.cards = calloc(menu->count, sizeof(*view.cards));
-    ESP_ERROR_CHECK(view.cards ? ESP_OK : ESP_ERR_NO_MEM);
-    view.compact = menu->count > 3;
+    view.compact = settings->count > 3 || network->count > 3;
     view.phase = (ui_menu_phase_t)-1;
     view.footer_color = UINT32_MAX;
-    view.selected = view.list_item = view.cursor = UINT_MAX;
+    view.list_item = view.cursor = UINT_MAX;
     view.root = box(screen, 0, 0, 172, 320, BG);
     view.title = label(view.root, 12, 5, 116, "SETTINGS", &ui_font_menu_title);
     box(view.root, 12, 30, 116, 1, BORDER);
@@ -305,18 +332,9 @@ lv_obj_t *ui_menu_view_create(lv_obj_t *screen, const ui_menu_t *menu)
     lv_obj_set_style_text_color(view.current, lv_color_hex(MINT), 0);
     view.current_check = line(view.root, 108, 46, check, 3);
     lv_obj_set_style_line_color(view.current_check, lv_color_hex(MINT), 0);
-    view.main_list = box(view.root, 8, 42, 120, view.compact ? 240 : 202, 0);
-    scrolling(view.main_list);
-    int y = 0;
-    for (unsigned i = 0; i < menu->count; ++i) {
-        const ui_menu_type_t type = menu->items[i].type;
-        const int h = type == UI_MENU_BACK ? (view.compact ? 36 : 40) :
-                      type == UI_MENU_NUMBER ? (view.compact ? 60 : 68) :
-                      type == UI_MENU_ACTION && view.compact ? 56 : 64;
-        create_card(&view.cards[i], view.main_list, y, h, &menu->items[i]);
-        const bool next_is_back = i + 1 < menu->count && menu->items[i + 1].type == UI_MENU_BACK;
-        y += h + (view.compact ? 8 : next_is_back ? 12 : 10);
-    }
+    create_list(&view.settings, settings);
+    create_list(&view.network, network);
+    show(view.network.root, false);
     view.option_list = box(view.root, 8, 72, 120, 192, 0);
     scrolling(view.option_list);
     const ui_menu_item_t back = {.title = "BACK", .type = UI_MENU_BACK};
@@ -331,13 +349,17 @@ lv_obj_t *ui_menu_view_create(lv_obj_t *screen, const ui_menu_t *menu)
     return view.root;
 }
 
-void ui_menu_view_update(const ui_menu_t *menu, const ui_menu_footer_t *footer)
+void ui_menu_view_update(const ui_menu_t *menu, const ui_menu_footer_t *footer, bool network)
 {
     const ui_menu_item_t *item = &menu->items[menu->selected];
     const ui_menu_value_t *value = &menu->values[menu->selected];
     const bool list = menu->phase == UI_MENU_LIST;
-    if (view.phase != menu->phase) {
-        show(view.main_list, !list); show(view.footer, !list);
+    menu_list_t *card_list = network ? &view.network : &view.settings;
+    if (view.network_page != network) view.list_item = UINT_MAX;
+    if (view.phase != menu->phase || view.network_page != network) {
+        show(view.settings.root, !list && !network);
+        show(view.network.root, !list && network);
+        show(view.footer, !list);
         show(view.option_list, list); show(view.back.root, list);
         show(view.counter, list); show(view.current, list); show(view.current_check, list);
         lv_obj_set_width(view.title, list ? 84 : 116);
@@ -346,8 +368,9 @@ void ui_menu_view_update(const ui_menu_t *menu, const ui_menu_footer_t *footer)
             set_text(view.counter, "");
         }
         view.phase = menu->phase;
+        view.network_page = network;
     }
-    set_text(view.title, list ? item->title : "SETTINGS");
+    set_text(view.title, list ? item->title : network ? "NETWORK" : "SETTINGS");
     if (list) {
         char counter[32];
         snprintf(counter, sizeof(counter), "%u/%u", menu->cursor < item->choice.count ? menu->cursor + 1 : item->choice.count, item->choice.count);
@@ -363,11 +386,11 @@ void ui_menu_view_update(const ui_menu_t *menu, const ui_menu_footer_t *footer)
         ui_key_hints_menu(menu->cursor == item->choice.count ? UI_MENU_HINT_BROWSE : UI_MENU_HINT_CHOICE);
     } else {
         for (unsigned i = 0; i < menu->count; ++i)
-            update_card(&view.cards[i], &menu->items[i], &menu->values[i], menu->selected == i,
+            update_card(&card_list->cards[i], &menu->items[i], &menu->values[i], menu->selected == i,
                         menu->selected == i && menu->phase == UI_MENU_EDIT, menu->candidate);
-        if (view.selected != menu->selected) {
-            lv_obj_scroll_to_view(view.cards[menu->selected].root, LV_ANIM_OFF);
-            view.selected = menu->selected;
+        if (card_list->selected != menu->selected) {
+            lv_obj_scroll_to_view(card_list->cards[menu->selected].root, LV_ANIM_OFF);
+            card_list->selected = menu->selected;
         }
         set_text(view.status, view.compact && !*footer->status ? footer->hint : footer->status);
         if (view.footer_color != footer->color) {
@@ -381,7 +404,7 @@ void ui_menu_view_update(const ui_menu_t *menu, const ui_menu_footer_t *footer)
         else if (menu->phase == UI_MENU_EDIT)
             hint = item->type == UI_MENU_NUMBER ? UI_MENU_HINT_NUMBER : UI_MENU_HINT_CHOICE;
         else if (item->type == UI_MENU_ACTION) hint = UI_MENU_HINT_ACTION;
-        else if (item->type == UI_MENU_SUBMENU) hint = UI_MENU_HINT_OPEN;
+        else if (item->type == UI_MENU_SUBMENU || item->type == UI_MENU_PAGE) hint = UI_MENU_HINT_OPEN;
         ui_key_hints_menu(hint);
     }
 }

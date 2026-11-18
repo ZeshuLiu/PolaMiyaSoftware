@@ -26,6 +26,8 @@ void ui_view_show(unsigned page);
 /* Update only the independent EJECT page, using actual motor current and elapsed time. */
 void ui_view_eject(uint64_t elapsed_ms, const power_sample_t *sample);
 void ui_view_power(const power_sample_t *sample, battery_status_t battery);
+/* HOME radio state: Wi-Fi enabled/IP and provisioning active/BLE connected. */
+void ui_view_wireless(bool wifi_on, bool wifi_connected, bool ble_active, bool ble_connected);
 void ui_view_range(const focus_distance_t *focus, const sdm50_sample_t *actual);
 /* Style the target after automatic or manual selection. */
 void ui_view_focus_style(bool editing, bool automatic, bool too_close, bool ready, bool blink_on);
@@ -34,7 +36,8 @@ void ui_view_film(unsigned remaining);
 void ui_view_uptime(uint64_t seconds);
 void ui_view_info(const settings_values_t *values, const settings_status_t *status,
                   bool available);
-void ui_view_focus_info(const focus_distance_t *focus, const focus_unit_snapshot_t *snapshot);
+void ui_view_focus_info(const focus_distance_t *focus, const focus_unit_snapshot_t *snapshot,
+                        bool position_valid, uint32_t distance_mm, bool infinity);
 /* Update the right-hand key hints for HOME or the INFO/SETUP pages. */
 void ui_view_key_hints(unsigned page, unsigned home_func, bool home_selected);
 

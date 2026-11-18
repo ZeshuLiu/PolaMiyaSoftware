@@ -68,6 +68,12 @@ void runtime_diagnostics_poll(void)
     }
     ESP_LOGI(TAG, "stack_min_bytes main=%ld ui=%ld LVGL=%ld ADC=%ld SDM50=%ld keys=%ld film=%ld",
              minimum[0], minimum[1], minimum[2], minimum[3], minimum[4], minimum[5], minimum[6]);
+    /* The default event loop and Wi-Fi connection worker are created lazily. */
+    const TaskHandle_t event_task = xTaskGetHandle("sys_evt");
+    const TaskHandle_t wifi_task = xTaskGetHandle("wifi_control");
+    ESP_LOGI(TAG, "stack_min_bytes sys_evt=%ld wifi_control=%ld",
+             event_task ? (long)uxTaskGetStackHighWaterMark(event_task) : -1L,
+             wifi_task ? (long)uxTaskGetStackHighWaterMark(wifi_task) : -1L);
     ESP_LOGI(TAG, "internal_heap_bytes free=%lu minimum=%lu largest=%lu integrity=OK",
              (unsigned long)heap_caps_get_free_size(INTERNAL_CAPS),
              (unsigned long)heap_caps_get_minimum_free_size(INTERNAL_CAPS),

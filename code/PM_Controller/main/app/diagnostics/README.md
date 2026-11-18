@@ -1,3 +1,5 @@
+2026-11-04 Wi-Fi 启动断言：JTAG 读取运行 ELF SHA256 `7165e8d87c4343f2f596da7701e8ae75b78527c519942f29938d229a62098104`，CPU0 的 `sys_evt` 在处理 `WIFI_EVENT_STA_START` 返回后释放事件循环递归互斥锁时触发 `spinlock_acquire` 断言。该锁的计数及队列字段异常，锁位于 `sys_evt` 栈下界附近；从栈填充观察到余量很低，但不能据此证明覆盖来源。`0xCDCD` 是 CPU0 的锁拥有者值，不是释放标记。为缩短事件回调，将保存网络的 NVS 读取、连接 / 重试及 Wi-Fi 和 HTTP 启停收拢到 `wifi_control` 任务；增加 `sys_evt` 和 `wifi_control` 栈余量诊断。本机事件任务栈配置未改，未编译、测试或烧录，需实机核对栈余量及是否仍触发断言。
+
 # 运行异常定位
 
 2026-11-02：用户提供静止界面运行约 657 s 后 Core 0 的 StoreProhibited，写入地址 `0x0039cbe0`，回溯标记 CORRUPTED，随后自动重启。崩溃固件 ELF SHA 前缀为 `8ad557bc5`，对应 ELF 已未保留；当前 ELF 为 `cad37faea257b297c3108116b3ec79bb63aaf1cf8852bca6721937a3fdca7e73`。当前 ELF 与当前 BIN 内嵌 SHA 一致，但不能代替崩溃版本进行准确符号定位。根因仍未确认，新增内容为定位措施，不是已完成故障修复的声明。

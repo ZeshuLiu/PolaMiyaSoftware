@@ -25,6 +25,8 @@ static const parameter_t parameters[] = {
     {SETTINGS_CAL_B, offsetof(settings_values_t, cal_b), 0, UINT64_MAX, false},
     {SETTINGS_CAL_MIN_MM, offsetof(settings_values_t, cal_min_mm), FOCUS_CALIBRATION_MIN_DISTANCE_MM, UINT32_MAX, false},
     {SETTINGS_CAL_INF_TOL, offsetof(settings_values_t, cal_inf_tol), FOCUS_CALIBRATION_INFINITY_TOLERANCE_RAW, UINT32_MAX, false},
+    {SETTINGS_WIFI_ENABLED, offsetof(settings_values_t, wifi_enabled), 0, 1, false},
+    {SETTINGS_BLE_REMOTE_ENABLED, offsetof(settings_values_t, ble_remote_enabled), 0, 1, false},
 };
 #define PARAMETER_COUNT (sizeof(parameters) / sizeof(parameters[0]))
 #define ENTRY_BYTES 12U /* ID: u16, length: u16, value: u64; all little-endian. */

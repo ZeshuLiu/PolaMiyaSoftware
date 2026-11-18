@@ -6,7 +6,7 @@
 #include "esp_err.h"
 
 typedef enum {
-    UI_MENU_NUMBER, UI_MENU_ACTION, UI_MENU_CHOICE, UI_MENU_SUBMENU, UI_MENU_BACK,
+    UI_MENU_NUMBER, UI_MENU_ACTION, UI_MENU_CHOICE, UI_MENU_SUBMENU, UI_MENU_PAGE, UI_MENU_BACK,
 } ui_menu_type_t;
 
 typedef esp_err_t (*ui_menu_read_t)(int32_t *value);
@@ -36,6 +36,7 @@ typedef struct {
             bool (*enabled)(void);
             bool (*busy)(void);
             const char *(*status)(void);
+            const char *(*detail)(void);
         } action;
     };
 } ui_menu_item_t;
@@ -43,12 +44,12 @@ typedef struct {
 typedef struct {
     int32_t value;
     bool valid, enabled, busy;
-    const char *status;
+    const char *status, *detail;
 } ui_menu_value_t;
 
 typedef enum { UI_MENU_BROWSE, UI_MENU_EDIT, UI_MENU_LIST } ui_menu_phase_t;
 typedef enum {
-    UI_MENU_NO_CHANGE, UI_MENU_CHANGED, UI_MENU_STARTED, UI_MENU_LEAVE, UI_MENU_FAILED,
+    UI_MENU_NO_CHANGE, UI_MENU_CHANGED, UI_MENU_STARTED, UI_MENU_ENTER, UI_MENU_LEAVE, UI_MENU_FAILED,
 } ui_menu_result_t;
 
 typedef struct {

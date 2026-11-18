@@ -34,6 +34,7 @@ idf_component_register(
         "app/wifi_control/wifi_networks.c"
         "app/wifi_control/wifi_pair.c"
         "app/wifi_control/wifi_web.c"
+        "app/ble_remote/ble_remote.c"
         "app/focus_distance/focus_distance.c"
         "app/focus_position/focus_position.c"
         "app/power_monitor/power_monitor.c"
@@ -59,10 +60,11 @@ idf_component_register(
         "app/ui"
         "app/charge_status"
         "app/wifi_control"
+        "app/ble_remote"
         "app/focus_distance"
         "app/focus_position"
         "app/power_monitor"
-    PRIV_REQUIRES esp_system soc bt protocomm esp_http_server esp_wifi esp_event esp_netif nvs_flash esp_lcd esp_driver_spi esp_driver_gpio esp_driver_ledc esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_adc esp_timer freertos esp_rom esp_hw_support esp_app_format heap
+    PRIV_REQUIRES esp_system soc bt mbedtls protocomm esp_http_server esp_wifi esp_event esp_netif nvs_flash esp_lcd esp_driver_spi esp_driver_gpio esp_driver_ledc esp_driver_i2c esp_driver_gptimer esp_driver_uart esp_adc esp_timer freertos esp_rom esp_hw_support esp_app_format heap
 )
 
 # LVGL 9 builtin allocator supports a pool hook. Configure only the LVGL

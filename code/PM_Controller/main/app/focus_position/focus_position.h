@@ -7,6 +7,7 @@
 void focus_position_init(void);
 void focus_position_process(uint32_t now_ms);
 esp_err_t focus_position_set_target(int32_t raw);
+bool focus_position_idle(void);
 esp_err_t focus_position_home(uint32_t now_ms);
 bool focus_position_can_home(uint32_t now_ms);
 bool focus_position_is_homing(void);

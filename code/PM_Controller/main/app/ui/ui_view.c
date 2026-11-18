@@ -41,6 +41,8 @@ typedef enum {
 static struct {
     lv_obj_t *pages[UI_PAGE_COUNT];
     ui_battery_t battery;
+    lv_obj_t *wifi_lines[3], *wifi_dot, *bluetooth_line;
+    int wifi_state, bluetooth_state;
     lv_obj_t *battery_values;
     lv_obj_t *motor_values;
     lv_obj_t *number_label[2];
@@ -203,6 +205,56 @@ static void create_distance_scale(lv_obj_t *parent)
     view.actual_pointer = create_pointer(parent, false);
 }
 
+/* Stroke icons stay inside the otherwise empty HOME header, between the
+ * five-color mark and the battery/charging area. Point arrays outlive LVGL. */
+static lv_obj_t *wireless_line(lv_obj_t *parent, int x, int y,
+                               const lv_point_precise_t *points, unsigned count)
+{
+    lv_obj_t *line = lv_line_create(parent);
+    lv_obj_remove_style_all(line);
+    lv_obj_remove_flag(line, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_pos(line, x, y);
+    lv_line_set_points(line, points, count);
+    lv_obj_set_style_line_width(line, 2, 0);
+    lv_obj_set_style_line_rounded(line, true, 0);
+    lv_obj_set_style_line_color(line, lv_color_hex(0x52675f), 0);
+    return line;
+}
+
+static void create_wireless_icons(lv_obj_t *home)
+{
+    static const lv_point_precise_t wifi_outer[] = {{0,4},{3,2},{7,1},{11,2},{14,4}};
+    static const lv_point_precise_t wifi_middle[] = {{3,7},{5,6},{7,5},{9,6},{11,7}};
+    static const lv_point_precise_t wifi_inner[] = {{6,10},{7,9},{8,10}};
+    static const lv_point_precise_t bluetooth[] = {{1,3},{9,10},{4,14},{4,0},{9,4},{1,11}};
+    view.wifi_lines[0] = wireless_line(home, 81, 8, wifi_outer, 5);
+    view.wifi_lines[1] = wireless_line(home, 81, 8, wifi_middle, 5);
+    view.wifi_lines[2] = wireless_line(home, 81, 8, wifi_inner, 3);
+    view.wifi_dot = rectangle(home, 87, 20, 3, 3, 0x52675f);
+    lv_obj_set_style_radius(view.wifi_dot, LV_RADIUS_CIRCLE, 0);
+    view.bluetooth_line = wireless_line(home, 105, 8, bluetooth, 6);
+    view.wifi_state = -1;
+    view.bluetooth_state = -1;
+}
+
+void ui_view_wireless(bool wifi_on, bool wifi_connected, bool ble_active, bool ble_connected)
+{
+    if (view.page != UI_HOME) return;
+    const int wifi = !wifi_on ? 0 : wifi_connected ? 2 : 1;
+    const int bluetooth = !ble_active ? 0 : ble_connected ? 2 : 1;
+    if (wifi != view.wifi_state) {
+        const lv_color_t color = lv_color_hex(wifi == 2 ? 0x79f5a7 : wifi == 1 ? 0xffbe58 : 0x52675f);
+        for (unsigned i = 0; i < 3; ++i) lv_obj_set_style_line_color(view.wifi_lines[i], color, 0);
+        lv_obj_set_style_bg_color(view.wifi_dot, color, 0);
+        view.wifi_state = wifi;
+    }
+    if (bluetooth != view.bluetooth_state) {
+        const uint32_t color = bluetooth == 2 ? 0x69d6ff : bluetooth == 1 ? 0xffbe58 : 0x52675f;
+        lv_obj_set_style_line_color(view.bluetooth_line, lv_color_hex(color), 0);
+        view.bluetooth_state = bluetooth;
+    }
+}
+
 static void create_film_strip(lv_obj_t *parent)
 {
     view.film_count = label_font(parent, 100, 261, 24, "0", COLOR_TEXT,
@@ -241,6 +293,7 @@ void ui_view_create(lv_display_t *display)
     for (unsigned i = 0; i < sizeof(ui_home_tiles) / sizeof(ui_home_tiles[0]); ++i) {
         image(home, ui_home_tiles[i].x, ui_home_tiles[i].y, ui_home_tiles[i].image);
     }
+    create_wireless_icons(home);
     ui_battery_create(&view.battery, home);
     lv_obj_set_x(lv_obj_get_parent(view.battery.frame), 132);
     lv_obj_set_style_bg_color(lv_obj_get_parent(view.battery.frame), lv_color_hex(COLOR_BG), 0);
@@ -551,7 +604,8 @@ void ui_view_info(const settings_values_t *values, const settings_status_t *stat
                       status->loaded_from_eeprom ? "EEPROM OK" : "RAM DEFAULTS");
 }
 
-void ui_view_focus_info(const focus_distance_t *focus, const focus_unit_snapshot_t *snapshot)
+void ui_view_focus_info(const focus_distance_t *focus, const focus_unit_snapshot_t *snapshot,
+                        bool position_valid, uint32_t distance_mm, bool infinity)
 {
     if (view.page == UI_HOME) {
         set_text(view.focus_notice, snapshot->storage_error ? "SAVE ERROR" :
@@ -572,10 +626,7 @@ void ui_view_focus_info(const focus_distance_t *focus, const focus_unit_snapshot
                         snapshot->mode == 1 ? "F:GLIDE" :
                         snapshot->mode == 2 ? "F:OPEN" : "F:READY";
     set_text(view.focus_status, state);
-    uint32_t distance_mm = 0;
-    bool infinity = false;
-    if (focus->state != FOCUS_DISTANCE_READY ||
-        !focus_distance_from_raw(snapshot->position, &distance_mm, &infinity)) {
+    if (!position_valid) {
         set_text(view.focus_position, "FOCUS --");
     } else if (infinity) {
         set_text(view.focus_position, "FOCUS INF");

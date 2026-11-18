@@ -1,5 +1,7 @@
 # 对焦位置恢复与掉电保护
 
+手机遥控通过 UI 任务查询 `focus_position_idle()`，在可接收新目标时调用现有 `focus_position_set_target()`。BLE 任务仅收发遥测和命令，运动与 EEPROM 仍由 UI 任务处理。详见 [BLE 遥测和手动对焦](../ble_remote/README.md)。
+
 设置菜单通过 `focus_position_can_home(now_ms)` 和 `focus_position_is_homing()` 获取执行可用性及寻零状态；这两个接口只读 UI 任务状态。实际 `focus_position_home()` 仍自行检查可用性，菜单提示不能替代命令入口检查。此接入不改变运动和 EEPROM 时序。
 
 2026-11-02：适配 FocusUnit 外部初始化协议。UI 任务独占本模块，`focus_position_process()` 处理 UART 和同步 EEPROM 保存；调用时不持有 LVGL 锁，不新增任务。仅完成源码静态核对；未编译、测试或烧录，实机未验证。

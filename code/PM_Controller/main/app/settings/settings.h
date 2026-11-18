@@ -22,6 +22,8 @@ typedef enum {
     SETTINGS_CAL_B = 10,
     SETTINGS_CAL_MIN_MM = 11,
     SETTINGS_CAL_INF_TOL = 12,
+    SETTINGS_WIFI_ENABLED = 13,
+    SETTINGS_BLE_REMOTE_ENABLED = 14,
 } settings_key_t;
 
 typedef struct {
@@ -34,6 +36,8 @@ typedef struct {
     uint64_t cal_offset, cal_a, cal_b; /* IEEE-754 binary64 bits. */
     uint64_t cal_min_mm, cal_inf_tol;
     uint64_t focus_valid;     /* 0 before motion; 1 only after confirmed STOP. */
+    uint64_t wifi_enabled;    /* Saved user preference, 0 or 1. */
+    uint64_t ble_remote_enabled; /* Saved BLE REMOTE preference, 0 or 1. */
 } settings_values_t;
 
 typedef struct {
@@ -55,6 +59,11 @@ esp_err_t settings_increment(settings_key_t key, uint64_t amount);
 esp_err_t settings_commit(void);
 /* Persist only shutter_count; leave other uncommitted RAM parameters untouched. */
 esp_err_t settings_commit_shutter(void);
+/* Update and persist the Wi-Fi preference only. On write failure the RAM
+ * value remains dirty and can be retried with settings_commit(). */
+esp_err_t settings_save_wifi_enabled(bool enabled);
+/* Same selected-field save semantics as the Wi-Fi preference. */
+esp_err_t settings_save_ble_remote_enabled(bool enabled);
 /* Persist only film_remaining; leave other uncommitted RAM parameters untouched. */
 esp_err_t settings_commit_film(void);
 /* One-shot decrement (dark slide 9 -> 8, otherwise saturating at 0) and film-only save.

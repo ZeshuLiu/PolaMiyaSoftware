@@ -81,6 +81,11 @@ esp_err_t focus_position_set_target(int32_t raw)
     return ESP_OK;
 }
 
+bool focus_position_idle(void)
+{
+    return focus.phase == READY && !focus.pending && !focus.storage_error;
+}
+
 bool focus_position_can_home(uint32_t now_ms)
 {
     const focus_unit_snapshot_t s = focus_unit_snapshot(now_ms);

@@ -6,6 +6,8 @@
 esp_err_t wifi_pair_start(void);
 void wifi_pair_cancel(void);
 bool wifi_pair_active(void);
+/* BLE phone connection, not merely a pending provisioning request. */
+bool wifi_pair_ble_connected(void);
 /* Returned string belongs to the UI task and remains valid until next call. */
 const char *wifi_pair_status(void);
 #endif

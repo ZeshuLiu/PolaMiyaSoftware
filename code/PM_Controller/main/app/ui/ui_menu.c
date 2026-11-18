@@ -51,6 +51,7 @@ void ui_menu_refresh(ui_menu_t *menu)
             value->busy = item->action.busy && item->action.busy();
             value->enabled = !value->busy && (!item->action.enabled || item->action.enabled());
             value->status = item->action.status ? item->action.status() : NULL;
+            value->detail = item->action.detail ? item->action.detail() : NULL;
         }
     }
 }
@@ -122,6 +123,7 @@ ui_menu_result_t ui_menu_confirm(ui_menu_t *menu)
         if (result != UI_MENU_FAILED) menu->phase = UI_MENU_BROWSE;
         return result;
     }
+    if (item->type == UI_MENU_PAGE) return UI_MENU_ENTER;
     if (item->type == UI_MENU_BACK) return UI_MENU_LEAVE;
     if (!value->enabled) {
         menu->error = ESP_ERR_INVALID_STATE;

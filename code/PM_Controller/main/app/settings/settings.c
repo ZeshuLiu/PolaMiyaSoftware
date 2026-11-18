@@ -235,6 +235,30 @@ esp_err_t settings_commit_shutter(void)
     return result;
 }
 
+esp_err_t settings_save_wifi_enabled(bool enabled)
+{
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    store.values.wifi_enabled = enabled ? 1 : 0;
+    settings_values_t values = store.persisted_values;
+    values.wifi_enabled = store.values.wifi_enabled;
+    const esp_err_t result = commit_values_locked(&values);
+    xSemaphoreGive(store.mutex);
+    return result;
+}
+
+esp_err_t settings_save_ble_remote_enabled(bool enabled)
+{
+    if (!store.mutex) return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(store.mutex, portMAX_DELAY);
+    store.values.ble_remote_enabled = enabled ? 1 : 0;
+    settings_values_t values = store.persisted_values;
+    values.ble_remote_enabled = store.values.ble_remote_enabled;
+    const esp_err_t result = commit_values_locked(&values);
+    xSemaphoreGive(store.mutex);
+    return result;
+}
+
 static esp_err_t commit_film_locked(void)
 {
     settings_values_t values = store.persisted_values;

@@ -1,6 +1,8 @@
 #include "wifi_control.h"
 #include "wifi_web.h"
 #include "wifi_networks.h"
+#include "wifi_pair.h"
+#include "settings.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
@@ -12,6 +14,8 @@
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
+#include "freertos/semphr.h"
 
 static bool initialized;
 static atomic_bool enabled, has_network, got_ip, provisioning, command_pending;
@@ -19,12 +23,26 @@ static atomic_int command_error;
 static bool nvs_ready, netif_ready, event_ready, station_created, handler_registered;
 static bool ip_handler_registered, disconnect_handler_registered, stop_handler_registered;
 
-/* Event-loop-owned snapshot, ordered oldest to newest. Avoid writing the
- * driver configuration to NVS on every connection or retry. */
+/* Only the network worker accesses this snapshot. The event loop queues
+ * small events and never reads NVS or builds a Wi-Fi configuration. */
+typedef enum {
+    CONNECTION_START, CONNECTION_DISCONNECTED, WIFI_ON, WIFI_OFF, WEB_UPDATE,
+} network_command_kind_t;
+typedef struct { SemaphoreHandle_t done; esp_err_t result; } switch_completion_t;
+typedef struct {
+    network_command_kind_t kind;
+    unsigned generation;
+    switch_completion_t *completion; /* Non-NULL only for the pairing task. */
+} network_command_t;
+static QueueHandle_t network_commands;
+static atomic_uint connection_generation;
+
 static wifi_network_t networks[WIFI_NETWORK_LIMIT];
 static size_t network_count;
 static size_t next_network;
 static unsigned remaining_attempts;
+
+static esp_err_t set_enabled(bool requested);
 
 static esp_err_t connect_saved(size_t index)
 {
@@ -37,22 +55,80 @@ static esp_err_t connect_saved(size_t index)
     return error == ESP_OK ? esp_wifi_connect() : error;
 }
 
+static void process_connection_event(const network_command_t *event, unsigned *handled_generation)
+{
+    if (!atomic_load(&enabled) || atomic_load(&provisioning) ||
+        event->generation != atomic_load(&connection_generation)) return;
+    if (*handled_generation != event->generation) {
+        network_count = 0;
+        remaining_attempts = 0;
+        *handled_generation = event->generation;
+    }
+    if (event->kind == CONNECTION_START) {
+        network_count = 0;
+        remaining_attempts = 0;
+        const esp_err_t error = wifi_networks_load(networks, &network_count);
+        if (error != ESP_OK) {
+            ESP_LOGW("wifi", "Saved network read failed: %s", esp_err_to_name(error));
+            return;
+        }
+        if (!atomic_load(&enabled) || atomic_load(&provisioning) ||
+            event->generation != atomic_load(&connection_generation)) return;
+        if (!network_count) return;
+        next_network = network_count - 1;
+        remaining_attempts = (unsigned)network_count - 1;
+    } else {
+        if (!remaining_attempts || !network_count) return;
+        --remaining_attempts;
+        next_network = next_network ? next_network - 1 : network_count - 1;
+    }
+    const esp_err_t result = connect_saved(next_network);
+    if (result != ESP_OK) ESP_LOGW("wifi", "Connect request failed: %s", esp_err_to_name(result));
+}
+
+static void network_worker(void *arg)
+{
+    (void)arg;
+    network_command_t event;
+    unsigned handled_generation = 0;
+    while (xQueueReceive(network_commands, &event, portMAX_DELAY) == pdTRUE) {
+        if (event.kind == WIFI_ON || event.kind == WIFI_OFF) {
+            esp_err_t result = set_enabled(event.kind == WIFI_ON);
+            /* Internal pairing toggles are temporary. Only UI/startup requests
+             * persist the preference; do not save unrelated pending edits. */
+            if (result == ESP_OK && !event.completion) {
+                result = settings_save_wifi_enabled(event.kind == WIFI_ON);
+                if (result != ESP_OK) ESP_LOGW("wifi", "Preference save failed: %s", esp_err_to_name(result));
+            }
+            if (result != ESP_OK) ESP_LOGW("wifi", "Switch or save failed: %s", esp_err_to_name(result));
+            if (event.completion) {
+                event.completion->result = result;
+                xSemaphoreGive(event.completion->done);
+            } else {
+                atomic_store(&command_error, result);
+                atomic_store(&command_pending, false);
+            }
+        } else if (event.kind == CONNECTION_START || event.kind == CONNECTION_DISCONNECTED) {
+            process_connection_event(&event, &handled_generation);
+        }
+        /* Also reconcile after a non-web event, so queue saturation cannot
+         * lose a page-close or network-change request. */
+        wifi_web_process();
+    }
+    vTaskDelete(NULL);
+}
+
+static void queue_connection_event(network_command_kind_t kind)
+{
+    const network_command_t event = {.kind = kind, .generation = atomic_load(&connection_generation)};
+    if (xQueueSend(network_commands, &event, 0) != pdTRUE)
+        ESP_LOGW("wifi", "Connection event queue full");
+}
+
 static void on_station_start(void *arg, esp_event_base_t base, int32_t id, void *data)
 {
     (void)arg; (void)base; (void)id; (void)data;
-    if (atomic_load(&provisioning)) return;
-    network_count = 0;
-    remaining_attempts = 0;
-    const esp_err_t error = wifi_networks_load(networks, &network_count);
-    if (error != ESP_OK) {
-        ESP_LOGW("wifi", "Saved network read failed: %s", esp_err_to_name(error));
-        return;
-    }
-    if (network_count) {
-        next_network = network_count - 1;
-        remaining_attempts = (unsigned)network_count - 1;
-        (void)connect_saved(next_network);
-    }
+    if (!atomic_load(&provisioning)) queue_connection_event(CONNECTION_START);
 }
 
 static void on_network_event(void *arg, esp_event_base_t base, int32_t id, void *data)
@@ -62,16 +138,15 @@ static void on_network_event(void *arg, esp_event_base_t base, int32_t id, void 
         atomic_store(&got_ip, true);
         const ip_event_got_ip_t *event = data;
         ESP_LOGI("wifi", "LAN address: " IPSTR, IP2STR(&event->ip_info.ip));
-        const esp_err_t error = wifi_web_start();
-        if (error != ESP_OK) ESP_LOGW("wifi", "Web start failed: %s", esp_err_to_name(error));
+        const esp_err_t error = wifi_web_set_network(true);
+        if (error != ESP_OK) ESP_LOGW("wifi", "Web start request failed: %s", esp_err_to_name(error));
     } else {
         atomic_store(&got_ip, false);
-        wifi_web_stop();
-        if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED && atomic_load(&enabled) && !atomic_load(&provisioning) && remaining_attempts) {
-            --remaining_attempts;
-            next_network = next_network ? next_network - 1 : network_count - 1;
-            (void)connect_saved(next_network);
-        }
+        const esp_err_t error = wifi_web_set_network(false);
+        if (error != ESP_OK) ESP_LOGW("wifi", "Web stop request failed: %s", esp_err_to_name(error));
+        if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED &&
+            atomic_load(&enabled) && !atomic_load(&provisioning))
+            queue_connection_event(CONNECTION_DISCONNECTED);
     }
 }
 
@@ -148,11 +223,12 @@ static esp_err_t initialize(void)
     return ESP_OK;
 }
 
-esp_err_t wifi_control_set_enabled(bool requested)
+static esp_err_t set_enabled(bool requested)
 {
     if (requested == enabled) return ESP_OK;
     if (!requested) {
         if (atomic_load(&provisioning)) return ESP_ERR_INVALID_STATE;
+        atomic_fetch_add(&connection_generation, 1);
         atomic_store(&enabled, false); /* Suppress reconnect while stopping. */
         ESP_LOGI("wifi", "stop: driver");
         const esp_err_t error = esp_wifi_stop();
@@ -173,45 +249,69 @@ esp_err_t wifi_control_set_enabled(bool requested)
     if (error != ESP_OK) return error;
     has_network = saved_count != 0;
     ESP_LOGI("wifi", "start: driver");
+    /* STA_START can be delivered before esp_wifi_start() returns. Publish the
+     * intended state first so the worker does not discard that event. */
+    atomic_fetch_add(&connection_generation, 1);
+    atomic_store(&enabled, true);
     error = esp_wifi_start();
-    if (error != ESP_OK) { has_network = false; return error; }
-    enabled = true;
+    if (error != ESP_OK) { atomic_store(&enabled, false); has_network = false; return error; }
     ESP_LOGI("wifi", "start: complete");
     return ESP_OK;
 }
 
-static void wifi_switch_task(void *argument)
+/* Application Wi-Fi on/off requests, including those from pairing, use the
+ * network worker. The SDK provisioning manager still owns its own operations.
+ * No timeout: completion remains on this caller's stack. */
+esp_err_t wifi_control_set_enabled(bool requested)
 {
-    const bool requested = (uintptr_t)argument != 0U;
-    ESP_LOGI("wifi", "worker entered: requested=%s", requested ? "ON" : "OFF");
-    const esp_err_t error = wifi_control_set_enabled(requested);
-    atomic_store(&command_error, error);
-    if (error != ESP_OK) ESP_LOGW("wifi", "switch failed: %s", esp_err_to_name(error));
-    atomic_store(&command_pending, false);
-    vTaskDelete(NULL);
+    if (!network_commands) return ESP_ERR_INVALID_STATE;
+    switch_completion_t completion = {.done = xSemaphoreCreateBinary(), .result = ESP_FAIL};
+    if (!completion.done) return ESP_ERR_NO_MEM;
+    const network_command_t event = {.kind = requested ? WIFI_ON : WIFI_OFF, .completion = &completion};
+    xQueueSend(network_commands, &event, portMAX_DELAY);
+    xSemaphoreTake(completion.done, portMAX_DELAY);
+    vSemaphoreDelete(completion.done);
+    return completion.result;
+}
+
+/* The UI task creates the network worker lazily before any requests. The
+ * event loop and provisioning task only use it after that point. */
+esp_err_t wifi_control_prepare(void)
+{
+    if (network_commands) return ESP_OK;
+    network_commands = xQueueCreate(8, sizeof(network_command_t));
+    if (!network_commands) return ESP_ERR_NO_MEM;
+    if (xTaskCreate(network_worker, "wifi_control", 6144, NULL, 2, NULL) != pdPASS) {
+        vQueueDelete(network_commands);
+        network_commands = NULL;
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
+}
+
+/* Reconcile HTTP after every queued network event. If the queue is full, an
+ * existing event will wake the worker and it will see the latest web state. */
+esp_err_t wifi_control_notify_web(void)
+{
+    if (!network_commands) return ESP_ERR_INVALID_STATE;
+    const network_command_t event = {.kind = WEB_UPDATE};
+    (void)xQueueSend(network_commands, &event, 0);
+    return ESP_OK;
 }
 
 esp_err_t wifi_control_request_enabled(bool requested)
 {
-    ESP_LOGI("wifi", "UI requested: %s", requested ? "ON" : "OFF");
-    if (atomic_load(&provisioning)) {
-        ESP_LOGW("wifi", "request rejected: provisioning active");
-        return ESP_ERR_INVALID_STATE;
-    }
+    if (atomic_load(&provisioning) || wifi_pair_active()) return ESP_ERR_INVALID_STATE;
     bool expected = false;
-    if (!atomic_compare_exchange_strong(&command_pending, &expected, true)) {
-        ESP_LOGW("wifi", "request rejected: switch already pending");
-        return ESP_ERR_INVALID_STATE;
-    }
+    if (!atomic_compare_exchange_strong(&command_pending, &expected, true)) return ESP_ERR_INVALID_STATE;
+    const esp_err_t result = wifi_control_prepare();
+    if (result != ESP_OK) { atomic_store(&command_pending, false); return result; }
     atomic_store(&command_error, ESP_OK);
-    ESP_LOGI("wifi", "creating switch worker");
-    if (xTaskCreate(wifi_switch_task, "wifi_switch", 6144,
-                    (void *)(uintptr_t)(requested ? 1U : 0U), 2, NULL) != pdPASS) {
+    const network_command_t event = {.kind = requested ? WIFI_ON : WIFI_OFF};
+    if (xQueueSend(network_commands, &event, 0) != pdTRUE) {
         atomic_store(&command_pending, false);
-        ESP_LOGE("wifi", "switch worker creation failed");
-        return ESP_ERR_NO_MEM;
+        return ESP_ERR_TIMEOUT;
     }
-    ESP_LOGI("wifi", "switch worker created");
     return ESP_OK;
 }
 
@@ -220,6 +320,7 @@ esp_err_t wifi_control_last_error(void) { return (esp_err_t)atomic_load(&command
 
 bool wifi_control_is_enabled(void) { return enabled; }
 bool wifi_control_has_network(void) { return has_network; }
+bool wifi_control_is_connected(void) { return atomic_load(&enabled) && atomic_load(&got_ip); }
 
 bool wifi_control_ip(char *buffer, size_t length)
 {
@@ -233,6 +334,7 @@ bool wifi_control_ip(char *buffer, size_t length)
 
 void wifi_control_provisioning(bool active)
 {
+    atomic_fetch_add(&connection_generation, 1);
     atomic_store(&provisioning, active);
 }
 
